@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+.vite/
+
+# editor
+.vscode/
+.idea/
+.DS_Store
+
+# logs
+npm-debug.log*
+pnpm-debug.log*
+*.log
+
+# env
+.env
+.env.local
+
+# test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# claude / superpowers scratch
+.superpowers/
+.claude/
+
+# os
+Thumbs.db
