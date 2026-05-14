@@ -1,0 +1,10 @@
+/* placeholder — replaced in Phase B */
+:root {
+  --bone: #e8e6df;
+  --void: #0a0a0a;
+}
+body {
+  background: var(--void);
+  color: var(--bone);
+  font-family: ui-monospace, monospace;
+}
