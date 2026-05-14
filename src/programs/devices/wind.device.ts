@@ -4,9 +4,9 @@ const DIRS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW'
 
 const dev: DeviceModule = {
   name: 'wind',
-  read: (rng) => {
-    const dir = DIRS[Math.floor(rng() * DIRS.length)];
-    const kt = Math.floor(3 + rng() * 9);
+  read: (env) => {
+    const dir = DIRS[Math.floor(env.random() * DIRS.length)];
+    const kt = Math.floor(3 + env.random() * 9);
     return `${dir} ${kt}kt. light shift expected in 20 minutes.`;
   },
 };

@@ -19,6 +19,7 @@ import { registerAllDevices } from './kernel/devices';
 import { installKonami } from './programs/easter/konami';
 import { createPanelManager } from './kernel/panels';
 import './kernel/panels.css';
+import { requestEyesCamera } from './eyes/camera';
 import type { Program, ProgramContext, KeyEvent } from './kernel/program';
 
 async function main(): Promise<void> {
@@ -31,7 +32,7 @@ async function main(): Promise<void> {
   const audio = createAudio();
   const fs = createFS(SNAPSHOT);
   const panels = createPanelManager(document.body);
-  registerAllDevices(fs);
+  registerAllDevices(fs, panels);
 
   const root = document.getElementById('root')!;
 
@@ -126,6 +127,14 @@ async function main(): Promise<void> {
     setTimeout(() => voidApi.shine(), 400);
     audio.play('easter.fireworks', 'program');
     terminal.println('* * * fireworks. you unlocked nothing in particular. * * *');
+  });
+
+  // Eyes: open camera in response to `eyes` program emission
+  events.on('eyes:open', () => {
+    void requestEyesCamera(panels).then((status) => {
+      if (status === 'denied')      terminal.println('eyes: permission denied. you are blind in here.');
+      else if (status === 'unsupported') terminal.println('eyes: this browser has no eye.');
+    });
   });
 
   // Submit handler

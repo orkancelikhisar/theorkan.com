@@ -15,7 +15,7 @@ const LINES = [
 
 const dev: DeviceModule = {
   name: 'harbor',
-  read: (rng) => LINES[Math.floor(rng() * LINES.length)],
+  read: (env) => LINES[Math.floor(env.random() * LINES.length)],
 };
 
 export default dev;
