@@ -1,0 +1,15 @@
+.stowaway-flash {
+  position: fixed;
+  color: var(--bone);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+  z-index: 9999;
+  background: var(--void);
+  padding: 4px 8px;
+  border: 1px solid var(--bone-faint);
+}
+.stowaway-flash.active { opacity: 1; }
