@@ -1,0 +1,40 @@
+.void {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+.void__shine {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(232,230,223,0.06) 0%, rgba(232,230,223,0) 60%);
+  opacity: 0;
+  transition: opacity 250ms ease-out;
+}
+.void__shine.active { opacity: 1; }
+.void__crackle {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(232,230,223,0.1) 1px, transparent 1px);
+  background-size: 3px 3px;
+  opacity: 0; transition: opacity 80ms;
+}
+.void__crackle.active { opacity: 0.4; }
+.void__particle {
+  position: absolute;
+  width: 2px; height: 2px;
+  background: var(--bone);
+  pointer-events: none;
+  transition: opacity 1s;
+}
+.void__whisper {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--bone);
+  opacity: 0;
+  letter-spacing: 0.5px;
+  transition: opacity 3s;
+  pointer-events: none;
+}
+.void__whisper.active { opacity: 0.25; }
