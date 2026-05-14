@@ -1,0 +1,16 @@
+{
+  "threads": [
+    { "id": "the harbor",   "leads": "cat /dev/harbor, ls /home/orkan/projects/regatta" },
+    { "id": "the salt",     "leads": "cat /dev/salt, then watch the whispers" },
+    { "id": "the regret",   "leads": "cat /dev/regret, then ls /var/regret/" },
+    { "id": "the regatta",  "leads": "run `regatta`. tribute to 2024 arkas aegean." },
+    { "id": "the whisper",  "leads": "wait quietly. then type a word you saw." },
+    { "id": "the cabinet",  "leads": "ls -la /home/orkan/. there are dotfiles." },
+    { "id": "the dilenci",  "leads": "cat /home/orkan/projects/dilenci/readme" },
+    { "id": "the wind",     "leads": "cat /dev/wind" },
+    { "id": "the stowaway", "leads": "cat /var/log/observers.log" },
+    { "id": "the poems",    "leads": "ls /usr/share/poems" },
+    { "id": "the gallery",  "leads": "run `gallery` (arrives v0.4)" },
+    { "id": "the noticeboard", "leads": "run `bbs`" }
+  ]
+}
