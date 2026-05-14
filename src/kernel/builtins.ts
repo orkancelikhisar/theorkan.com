@@ -19,7 +19,7 @@ export type BuiltinHandler = (
 export const BUILTIN_NAMES = [
   'cd', 'pwd', 'ls', 'cat', 'echo', 'clear', 'history', 'alias',
   'find', 'grep', 'touch', 'rm', 'mv', 'cp',
-  'tree', 'which', 'whatis', 'reset', 'vibe', 'mute', 'unmute', 'help',
+  'tree', 'which', 'whatis', 'reset', 'vibe', 'mute', 'unmute',
 ];
 
 interface AudioCtl {
@@ -238,11 +238,6 @@ export function createBuiltins(
     },
     mute: () => audio.mute(),
     unmute: () => audio.unmute(),
-    help: (_argv, _s, _fs, out) => {
-      // backup; the real help is a program in Phase M
-      out('type `help` for the catalogue.');
-      out('type `hints` for a soft compass.');
-    },
   };
 }
 
