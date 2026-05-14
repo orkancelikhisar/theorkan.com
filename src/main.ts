@@ -17,6 +17,9 @@ import { installInterceptors } from './stowaway/interceptor';
 import { installConsoleBanner } from './stowaway/console-banner';
 import { registerAllDevices } from './kernel/devices';
 import { installKonami } from './programs/easter/konami';
+import { createPanelManager } from './kernel/panels';
+import './kernel/panels.css';
+import { requestEyesCamera } from './eyes/camera';
 import type { Program, ProgramContext, KeyEvent } from './kernel/program';
 
 async function main(): Promise<void> {
@@ -28,7 +31,8 @@ async function main(): Promise<void> {
   const events = createEventBus();
   const audio = createAudio();
   const fs = createFS(SNAPSHOT);
-  registerAllDevices(fs);
+  const panels = createPanelManager(document.body);
+  registerAllDevices(fs, panels);
 
   const root = document.getElementById('root')!;
 
@@ -67,10 +71,10 @@ async function main(): Promise<void> {
     print: (t) => terminal.print(t),
     println: (t) => terminal.println(t),
     panel: {
-      spawn: () => 'noop',
-      close: () => {},
-      update: () => {},
-      focus: () => {},
+      spawn: (opts) => panels.spawn(opts),
+      close: (id) => panels.close(id),
+      update: (id, content) => panels.update(id, content),
+      focus: (id) => panels.focus(id),
     },
     fs: {
       read: (p) => fs.read(p),
@@ -125,6 +129,14 @@ async function main(): Promise<void> {
     terminal.println('* * * fireworks. you unlocked nothing in particular. * * *');
   });
 
+  // Eyes: open camera in response to `eyes` program emission
+  events.on('eyes:open', () => {
+    void requestEyesCamera(panels).then((status) => {
+      if (status === 'denied')      terminal.println('eyes: permission denied. you are blind in here.');
+      else if (status === 'unsupported') terminal.println('eyes: this browser has no eye.');
+    });
+  });
+
   // Submit handler
   terminal.onSubmit(async (line) => {
     history.add(line);
@@ -148,6 +160,8 @@ async function main(): Promise<void> {
     if (modalProgram) {
       const overlayClass = modalProgram.name === 'snake' ? '.snake-overlay'
         : modalProgram.name === '2048' ? '.t2048-overlay'
+        : modalProgram.name === 'life' ? '.life-overlay'
+        : modalProgram.name === 'regatta' ? '.regatta-overlay'
         : null;
       const overlayPresent = overlayClass ? document.querySelector(overlayClass) : null;
       if (overlayPresent) {

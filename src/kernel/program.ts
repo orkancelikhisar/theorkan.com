@@ -12,10 +12,12 @@ export interface KeyEvent {
 export interface PanelOptions {
   title?: string;
   content?: string;
+  contentEl?: HTMLElement;
   position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'center' | 'right' | 'left';
   width?: number;
   height?: number;
   closable?: boolean;
+  onClose?: () => void;
 }
 
 export interface ProgramContext {

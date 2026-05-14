@@ -108,6 +108,27 @@ export function createBoot(audio: AudioAPI): BootAPI {
       target.appendChild(box);
       const script = buildBootScript();
 
+      // Register the wake-up listener BEFORE rendering lines so it cannot be
+      // missed in a tight loop. The listener buffers a pending wake-intent so
+      // even a too-early keypress is honored once linesDone flips.
+      let linesDone = false;
+      let pendingWake = false;
+      let resolveWake!: () => void;
+      const wakePromise = new Promise<void>((res) => { resolveWake = res; });
+      function maybeWake(): void {
+        if (linesDone && pendingWake) {
+          window.removeEventListener('keydown', handler);
+          resolveWake();
+        }
+      }
+      const handler = (e: KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          pendingWake = true;
+          maybeWake();
+        }
+      };
+      window.addEventListener('keydown', handler);
+
       for (const line of script) {
         const el = document.createElement('div');
         el.className = `boot__line boot__line--${line.kind}`;
@@ -118,18 +139,10 @@ export function createBoot(audio: AudioAPI): BootAPI {
         else if (line.kind === 'prompt') audio.play('boot.complete', 'void');
         await new Promise((r) => setTimeout(r, 90 + Math.random() * 60));
       }
+      linesDone = true;
+      maybeWake();
 
-      // wait for first keypress to wake up
-      await new Promise<void>((resolve) => {
-        const handler = (e: KeyboardEvent) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            window.removeEventListener('keydown', handler);
-            resolve();
-          }
-        };
-        window.addEventListener('keydown', handler);
-      });
-
+      await wakePromise;
       box.remove();
     },
     markSeen() {

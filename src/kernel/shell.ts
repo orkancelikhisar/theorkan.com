@@ -8,9 +8,10 @@ export const BASELINE_DISCOVERED = new Set([
   'help', 'hints', 'secrets', 'motd', 'man', 'ls', 'cd', 'cat', 'echo',
   'pwd', 'clear', 'history', 'alias', 'find', 'grep', 'tree', 'which',
   'whatis', 'reset', 'vibe', 'mute', 'unmute',
-  'whoami', 'about', 'projects', 'contact', 'cv', 'man-orkan',
+  'whoami', 'about', 'projects', 'contact', 'cv', 'man-orkan', 'eyes',
   'cowsay', 'fortune', 'ping', 'top', 'ps', 'date', 'uname', 'uptime', 'figlet',
   'weather', 'say', 'bbs',
+  'snake', '2048', 'regatta', 'life', 'aquarium',
 ]);
 
 export { BUILTIN_NAMES };

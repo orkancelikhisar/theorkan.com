@@ -15,7 +15,7 @@ const LINES = [
 
 const dev: DeviceModule = {
   name: 'heart',
-  read: (rng) => (rng() < 0.05 ? 'it skipped.' : LINES[Math.floor(rng() * LINES.length)]),
+  read: (env) => (env.random() < 0.05 ? 'it skipped.' : LINES[Math.floor(env.random() * LINES.length)]),
 };
 
 export default dev;

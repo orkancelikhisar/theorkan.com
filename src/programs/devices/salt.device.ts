@@ -12,9 +12,9 @@ const LINES = [
 
 const dev: DeviceModule = {
   name: 'salt',
-  read: (rng) => {
+  read: (env) => {
     globalThis.__theorkan_whisper_boost = Date.now() + 120_000;
-    return LINES[Math.floor(rng() * LINES.length)];
+    return LINES[Math.floor(env.random() * LINES.length)];
   },
 };
 
