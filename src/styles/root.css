@@ -1,0 +1,44 @@
+@import './reset.css';
+
+:root {
+  --bone: #e8e6df;
+  --void: #0a0a0a;
+  --bone-dim: #88857c;
+  --bone-faint: #3a3935;
+
+  --font-mono: 'JetBrains Mono', 'Berkeley Mono', 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
+  --font-size-base: 14px;
+  --line-height: 1.5;
+
+  --void-shine: rgba(232, 230, 223, 0);
+
+  --term-max-width: 720px;
+  --term-padding: 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-cap: 'low'; }
+  *, *::before, *::after {
+    animation-duration: 0.001s !important;
+    transition-duration: 0.001s !important;
+  }
+}
+
+html, body {
+  background: var(--void);
+  color: var(--bone);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height);
+  overflow: hidden;
+}
+
+#root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+::selection { background: var(--bone); color: var(--void); }

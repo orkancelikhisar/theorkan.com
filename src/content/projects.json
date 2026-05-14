@@ -1,0 +1,12 @@
+[
+  { "name": "wearefakt.com", "year": "ongoing", "type": "engineering / co-founder", "desc": "Co-founded. See: https://wearefakt.com" },
+  { "name": "baldyapp.com", "year": "ongoing", "type": "engineering / launched", "desc": "Launched on iOS. See: https://baldyapp.com" },
+  { "name": "arkas aegean regatta — 3rd place", "year": "2024", "type": "sailing", "desc": "Skipper. Izmir, 5 days." },
+  { "name": "orbis cognitio", "year": "2023", "type": "research / modelling", "desc": "Large-scale dynamic socioeconomic model. With academics from industrial engineering, sociology, political sciences." },
+  { "name": "zero bytes foundation", "year": "2023", "type": "creative collective / founding member", "desc": "https://zerobytes.foundation" },
+  { "name": "currency — experiment", "year": "2022", "type": "research / art", "desc": "Research on the visual stimulant of 'value' via ML / evolutionary psychology." },
+  { "name": "artscloud top 100 — seoul", "year": "2022", "type": "digital art / award", "desc": "Top 100 Digital Artists of 2022. Understand Avenue, Seoul. NFT works." },
+  { "name": "rotaract art exhibition", "year": "2021", "type": "exhibition", "desc": "A.I. Depth Sensor + Particles Simulation. Izmir." },
+  { "name": "@art.ificialgallery", "year": "2020", "type": "platform / curation", "desc": "Online gallery, 3k+ users." },
+  { "name": "istanbul latent walk", "year": "2020", "type": "publication", "desc": "ArtDog Istanbul, 2020." }
+]

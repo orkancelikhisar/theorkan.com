@@ -1,0 +1,9 @@
+[
+  { "date": "2026-01-04", "from": "orkan",     "msg": "test message. the bbs is open. read freely." },
+  { "date": "2026-01-08", "from": "orkan",     "msg": "added /dev/regret. it grows over time." },
+  { "date": "2026-02-11", "from": "stowaway",  "msg": "i am here. i count what your browser tells me." },
+  { "date": "2026-03-02", "from": "orkan",     "msg": "happy with the regatta sim. wind shifts every 20s. try it." },
+  { "date": "2026-04-19", "from": "orkan",     "msg": "the dilenci will be moved here in v0.3. he is waking up." },
+  { "date": "2026-05-01", "from": "anonymous", "msg": "i found the harbor. thank you." },
+  { "date": "2026-05-12", "from": "orkan",     "msg": "if it asks for a word, give it `harbor`. it likes that one." }
+]

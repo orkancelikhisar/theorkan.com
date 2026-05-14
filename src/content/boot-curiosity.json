@@ -1,0 +1,17 @@
+[
+  "something moved in /var/log/whispers (ignored)",
+  "an unknown process touched /home/orkan/.dreams (ignored)",
+  "a file appeared in /usr/share/poems then left (ignored)",
+  "/dev/eyes blinked. (ignored)",
+  "the timestamp on /var/regret/2024_11_02 is wrong (ignored)",
+  "a duplicate motd was found and discarded (ignored)",
+  "/etc/orkan.conf was read 7 times last hour (ignored)",
+  "the bbs gained 1 message and lost 1 (net zero) (ignored)",
+  "/home/orkan/.bash_history has lines we cannot verify (ignored)",
+  "an empty file `nothing.txt` exists. nowhere it should. (ignored)",
+  "a whisper-word repeated. that should not happen. (ignored)",
+  "/dev/wind is offline by 4 minutes. it will return. (ignored)",
+  "someone tried to cat /dev/null. it answered. (ignored)",
+  "the regatta scoreboard rolled back a tenth of a second. (ignored)",
+  "the dilenci stirred during boot. unusual. (ignored)"
+]

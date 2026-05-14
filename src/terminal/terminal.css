@@ -1,0 +1,38 @@
+.terminal {
+  width: min(var(--term-max-width), 92vw);
+  max-height: 90vh;
+  padding: var(--term-padding);
+  font-family: var(--font-mono);
+  color: var(--bone);
+  white-space: pre-wrap;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bone-faint) transparent;
+  position: relative;
+  z-index: 1;
+}
+.terminal::-webkit-scrollbar { width: 6px; }
+.terminal::-webkit-scrollbar-thumb { background: var(--bone-faint); }
+
+.terminal__line { display: block; }
+.terminal__line--dim { color: var(--bone-dim); }
+.terminal__line--warn { color: var(--bone); opacity: 0.8; }
+
+.terminal__prompt-line { display: flex; align-items: baseline; }
+.terminal__prompt { display: inline-block; color: var(--bone); white-space: pre; }
+.terminal__input {
+  display: inline-block;
+  outline: none;
+  caret-color: transparent;
+  flex: 1;
+  min-width: 1px;
+  white-space: pre;
+}
+.terminal__cursor {
+  display: inline-block;
+  width: 0.6em; height: 1em;
+  background: var(--bone); color: var(--void);
+  vertical-align: text-bottom;
+  animation: blink 1s steps(2, end) infinite;
+}
+@keyframes blink { 50% { background: transparent; } }

@@ -1,0 +1,12 @@
+[
+  "/etc/orkan.conf — 3 deprecated values — see `man orkan`",
+  "/etc/orkan.conf — `passion=enabled` rejected by current build",
+  "/etc/orkan.conf — `philosophy_daemon=on` disabled at user request",
+  "/etc/orkan.conf — `romanticism=safe_mode` not honored",
+  "/etc/orkan.conf — `unsent_letters` directory not auto-flushed",
+  "/etc/orkan.conf — line 47 references `harbor.lock` (missing)",
+  "/etc/orkan.conf — `dilenci.autohide` setting is read-only",
+  "/etc/orkan.conf — timezone overridden by visitor (this is fine)",
+  "/etc/orkan.conf — `tts.voice = melancholic` falls back to system default",
+  "/etc/orkan.conf — `cv.format = pdf` resolves to /home/orkan/cv.pdf"
+]

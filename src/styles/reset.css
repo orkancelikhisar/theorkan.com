@@ -1,0 +1,5 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { line-height: 1.5; -webkit-font-smoothing: antialiased; }
+button, input, textarea { font: inherit; color: inherit; background: transparent; border: none; outline: none; }
+img, picture, video, canvas, svg { display: block; max-width: 100%; }

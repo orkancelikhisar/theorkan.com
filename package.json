@@ -1,0 +1,35 @@
+{
+  "name": "theorkan-com",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:once": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests --ext .ts",
+    "format": "prettier --write \"src/**/*.{ts,css,json}\"",
+    "new:program": "tsx scripts/new-program.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0",
+    "@types/node": "^20.14.0",
+    "@typescript-eslint/eslint-plugin": "^7.13.0",
+    "@typescript-eslint/parser": "^7.13.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.0",
+    "tsx": "^4.15.0",
+    "typescript": "^5.4.0",
+    "vite": "^5.3.0",
+    "vitest": "^1.6.0",
+    "jsdom": "^24.1.0",
+    "@vitest/coverage-v8": "^1.6.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}

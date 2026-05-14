@@ -1,0 +1,11 @@
+.t2048-overlay {
+  position: fixed; inset: 0;
+  background: var(--void);
+  color: var(--bone);
+  font-family: var(--font-mono);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  z-index: 100;
+}
+.t2048-board { font-size: 14px; line-height: 1.2; letter-spacing: 1px; white-space: pre; }
+.t2048-status { margin-top: 18px; opacity: 0.7; font-size: 12px; }
