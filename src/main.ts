@@ -17,6 +17,8 @@ import { installInterceptors } from './stowaway/interceptor';
 import { installConsoleBanner } from './stowaway/console-banner';
 import { registerAllDevices } from './kernel/devices';
 import { installKonami } from './programs/easter/konami';
+import { createPanelManager } from './kernel/panels';
+import './kernel/panels.css';
 import type { Program, ProgramContext, KeyEvent } from './kernel/program';
 
 async function main(): Promise<void> {
@@ -28,6 +30,7 @@ async function main(): Promise<void> {
   const events = createEventBus();
   const audio = createAudio();
   const fs = createFS(SNAPSHOT);
+  const panels = createPanelManager(document.body);
   registerAllDevices(fs);
 
   const root = document.getElementById('root')!;
@@ -67,10 +70,10 @@ async function main(): Promise<void> {
     print: (t) => terminal.print(t),
     println: (t) => terminal.println(t),
     panel: {
-      spawn: () => 'noop',
-      close: () => {},
-      update: () => {},
-      focus: () => {},
+      spawn: (opts) => panels.spawn(opts),
+      close: (id) => panels.close(id),
+      update: (id, content) => panels.update(id, content),
+      focus: (id) => panels.focus(id),
     },
     fs: {
       read: (p) => fs.read(p),
