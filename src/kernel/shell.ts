@@ -11,6 +11,7 @@ export const BASELINE_DISCOVERED = new Set([
   'whoami', 'about', 'projects', 'contact', 'cv', 'man-orkan', 'eyes',
   'cowsay', 'fortune', 'ping', 'top', 'ps', 'date', 'uname', 'uptime', 'figlet',
   'weather', 'say', 'bbs',
+  'snake', '2048', 'regatta', 'life', 'aquarium',
 ]);
 
 export { BUILTIN_NAMES };
