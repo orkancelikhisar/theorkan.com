@@ -1,6 +1,10 @@
 export interface Vec2 { x: number; y: number; }
 
-export const HULL_CAP_KT = 7;
+// Tuning constants (all original; tweak to taste)
+export const HULL_DRAG = 0.5;          // linear drag, per second
+export const SAIL_FORCE_COEFF = 0.18;
+export const SAIL_DAMPING = 0.86;       // per-step damping on sail rotation
+export const SAIL_RESTORE = 6;          // torque pulling sail toward wind alignment
 
 export function deg2rad(d: number): number { return (d * Math.PI) / 180; }
 export function rad2deg(r: number): number { return (r * 180) / Math.PI; }
@@ -12,17 +16,14 @@ export function signedAngleDeg(deg: number): number {
   return a;
 }
 
-// vec from heading + magnitude. heading=0 is +y (north), heading=90 is +x (east).
-export function vec(headingDeg: number, magnitude: number): Vec2 {
+// vec from heading + magnitude. heading=0 is +y (north), heading=90 is +x (east)
+export function vec(headingDeg: number, m: number): Vec2 {
   const r = deg2rad(headingDeg);
-  return { x: Math.sin(r) * magnitude, y: -Math.cos(r) * magnitude };
+  return { x: Math.sin(r) * m, y: -Math.cos(r) * m };
 }
 
-export function magnitude(v: Vec2): number {
-  return Math.hypot(v.x, v.y);
-}
+export function magnitude(v: Vec2): number { return Math.hypot(v.x, v.y); }
 
-// Heading angle (deg) of a vector (0 = north, clockwise positive)
 export function headingOf(v: Vec2): number {
   return rad2deg(Math.atan2(v.x, -v.y));
 }
@@ -31,67 +32,105 @@ export function apparentWind(trueWind: Vec2, boatVelocity: Vec2): Vec2 {
   return { x: trueWind.x - boatVelocity.x, y: trueWind.y - boatVelocity.y };
 }
 
-// Point-of-sail efficiency curve from spec §7.2
-export function pointOfSailEfficiency(apparentAngleDeg: number): number {
-  const a = Math.abs(apparentAngleDeg);
-  if (a < 30)      return 0;
-  if (a < 45)      return ((a - 30) / 15) * 0.7;
-  if (a < 60)      return 0.7 + ((a - 45) / 15) * 0.2;
-  if (a < 90)      return 0.9 + ((a - 60) / 30) * 0.1;
-  if (a < 110)     return 1.0;
-  if (a < 150)     return 1.0 - ((a - 110) / 40) * 0.15;
-  return 0.85 - ((a - 150) / 30) * 0.25;
+// Rotate v by deg. Our screen convention: +y is up; positive rotation is counterclockwise.
+export function rotate(v: Vec2, deg: number): Vec2 {
+  const r = deg2rad(deg);
+  const cs = Math.cos(r), sn = Math.sin(r);
+  return { x: v.x * cs - v.y * sn, y: v.x * sn + v.y * cs };
 }
 
-// Optimal sail angle for a given apparent angle (deg). Clamped 10..85.
-export function optimalSailAngle(apparentAngleDeg: number): number {
-  const half = Math.abs(apparentAngleDeg) / 2;
-  return Math.max(10, Math.min(85, half));
+// World ↔ boat frame conversions. In boat frame, +y points forward (bow), +x to starboard.
+export function toBoatFrame(world: Vec2, headingDeg: number): Vec2 {
+  return rotate(world, -headingDeg);
+}
+export function toWorldFrame(boat: Vec2, headingDeg: number): Vec2 {
+  return rotate(boat, headingDeg);
 }
 
-// Returns trim efficiency [0..1]. Loose-sail luff returns 0.2.
-export function trimEfficiency(
-  _heel: number, apparentAngleDeg: number, sailAngleDeg: number,
-): number {
-  const optimal = optimalSailAngle(apparentAngleDeg);
-  const error = Math.abs(sailAngleDeg - optimal);
-  if (sailAngleDeg > optimal && error > 25) return 0.2;
-  return Math.max(0, 1 - error / 30);
-}
-
-export function targetSpeed(
-  windKnots: number, apparentAngleDeg: number, sailAngleDeg: number,
-): number {
-  const pe = pointOfSailEfficiency(apparentAngleDeg);
-  const te = trimEfficiency(0, apparentAngleDeg, sailAngleDeg);
-  return Math.min(windKnots * 0.85, HULL_CAP_KT) * pe * te;
-}
-
-// Asymmetric acceleration: boats accelerate faster than they decelerate.
-export function nextSpeed(currentKt: number, target: number, dtMs: number): number {
-  const dt = dtMs / 1000;
-  let delta = (target - currentKt) * 1.2 * dt;
-  if (delta < 0) delta *= 0.5;
-  return Math.max(0, currentKt + delta);
-}
-
-// Rudder needs flow to work. turnRate = rudderAngleDeg * speed * k (deg/s)
+// Rudder needs flow to work. Returns deg/sec at the given rudder angle + speed.
 export function rudderTurnRate(rudderDeg: number, speedKt: number): number {
-  return rudderDeg * speedKt * 2.4;
+  return rudderDeg * Math.min(speedKt, 4) * 2.4;
 }
 
-// Leeway: small sideways slip into the wind on close-hauled headings.
-export function leewayKnots(apparentAngleDeg: number, windKnots: number): number {
-  const a = Math.abs(apparentAngleDeg);
-  if (a > 90) return 0;
-  const factor = 1 - a / 90;
-  return factor * 0.05 * windKnots;
+// Visual heel (degrees). Drives a small rotation on the boat sprite. Sign follows
+// the lateral force in the boat frame: starboard push → port heel.
+export function heelDegFromForce(lateralForce: number): number {
+  return -Math.max(-15, Math.min(15, lateralForce * 14));
 }
 
-// Visual heel only — signed degrees, clamped.
-export function heelDeg(apparentAngleDeg: number, windKnots: number, trim: number): number {
-  const a = Math.abs(apparentAngleDeg);
-  if (a > 120) return 0;
-  const sign = apparentAngleDeg > 0 ? 1 : -1;
-  return sign * Math.min(15, windKnots * 0.3 * Math.cos(deg2rad(a)) * trim);
+// ---- sail dynamics (force-based) ----
+
+export interface SailStep {
+  sailAngleDeg: number;      // new sail angle (signed, -90..+90)
+  sailVelDeg: number;        // new angular velocity (deg/s)
+  forceBoatFrame: Vec2;      // force on the boat, in boat frame
+  ropeTaut: boolean;
+  luffing: boolean;
+}
+
+/**
+ * Force-based sail dynamics step.
+ *
+ * Model:
+ *  - The sail rotates freely on its mast within [−sailMaxDeg, +sailMaxDeg].
+ *  - Wind torque pulls the sail toward the apparent-wind direction (alignment
+ *    with chord → zero angle of attack → no force).
+ *  - When the sail hits the mainsheet-imposed limit, the rope is taut and
+ *    transmits a force to the boat. That force is the component of apparent
+ *    wind perpendicular to the sail face, applied along the sail normal.
+ *  - When the sail is free (not at the limit), it just flaps. No force.
+ *
+ * Coordinates:
+ *  - sailAngleDeg / sailVelDeg in the boat frame; positive = boom to starboard.
+ *  - sailMaxDeg is the player-set mainsheet limit (≥ 0).
+ *  - apparentBoat is apparent wind in the boat frame (units: m/s).
+ */
+export function stepSail(
+  sailAngleDeg: number,
+  sailVelDeg: number,
+  sailMaxDeg: number,
+  apparentBoat: Vec2,
+  dtMs: number,
+): SailStep {
+  const dt = dtMs / 1000;
+
+  // Target sail angle: align with apparent wind direction (heading of the
+  // apparent wind vector). Clamp to the sail's mechanical range [-90, +90]
+  // (boom can't physically swing past 90° to either side).
+  const windDir = headingOf(apparentBoat);
+  const target = Math.max(-90, Math.min(90, signedAngleDeg(windDir)));
+
+  // Restoring torque toward target with damping.
+  const torque = (target - sailAngleDeg) * SAIL_RESTORE;
+  let newVel = sailVelDeg + torque * dt;
+  newVel *= SAIL_DAMPING;
+  let newAngle = sailAngleDeg + newVel * dt;
+
+  // Clamp to rope-imposed maximum.
+  let ropeTaut = false;
+  if (newAngle > sailMaxDeg)  { newAngle =  sailMaxDeg; newVel = 0; ropeTaut = true; }
+  if (newAngle < -sailMaxDeg) { newAngle = -sailMaxDeg; newVel = 0; ropeTaut = true; }
+
+  // Force from sail: only when rope is taut.
+  // Chord direction in boat frame: (sin(angle), -cos(angle)) — points along sail
+  // from mast (gooseneck) to clew (boom tip).
+  // Normal perpendicular to chord (90° CCW): (cos(angle), sin(angle)).
+  // The normal points to leeward (away from the wind face). Wind's component
+  // perpendicular to the sail pushes the boat in that same direction.
+  // Force = (wind · normal) × normal × coefficient.
+  let forceBoatFrame: Vec2 = { x: 0, y: 0 };
+  let luffing = false;
+  if (ropeTaut) {
+    const a = deg2rad(newAngle);
+    const nx = Math.cos(a), ny = Math.sin(a);
+    const wDotN = apparentBoat.x * nx + apparentBoat.y * ny;
+    forceBoatFrame = {
+      x: wDotN * nx * SAIL_FORCE_COEFF,
+      y: wDotN * ny * SAIL_FORCE_COEFF,
+    };
+  } else {
+    luffing = magnitude(apparentBoat) > 0.5;
+  }
+
+  return { sailAngleDeg: newAngle, sailVelDeg: newVel, forceBoatFrame, ropeTaut, luffing };
 }

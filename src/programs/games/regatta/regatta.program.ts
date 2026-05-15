@@ -94,8 +94,8 @@ const prog: Program = {
 
     if (key.key === 'ArrowLeft')  active.state.rudderIntent = -1;
     if (key.key === 'ArrowRight') active.state.rudderIntent = 1;
-    if (key.key === 'ArrowUp')    active.state.sailIntent = 1;
-    if (key.key === 'ArrowDown')  active.state.sailIntent = -1;
+    if (key.key === 'ArrowUp')    active.state.sheetIntent = 1;
+    if (key.key === 'ArrowDown')  active.state.sheetIntent = -1;
   },
   render: () => { /* RAF-driven in frame() */ },
   cleanup: () => close(),
@@ -104,7 +104,7 @@ const prog: Program = {
 window.addEventListener('keyup', (e) => {
   if (!active) return;
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') active.state.rudderIntent = 0;
-  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') active.state.sailIntent = 0;
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') active.state.sheetIntent = 0;
 });
 
 export default prog;
