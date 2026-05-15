@@ -62,7 +62,8 @@ async function main(): Promise<void> {
   let modalProgram: Program | null = null;
   function setModal(p: Program | null): void { modalProgram = p; }
 
-  // Forward-declare shell for ctxFactory to read cwd lazily
+  // Forward-declare shell for ctxFactory to read cwd lazily.
+  // eslint-disable-next-line prefer-const -- assigned after ctxFactory captures it
   let shell: ReturnType<typeof createShell>;
 
   const ctxFactory = (args: string[]): ProgramContext => ({
