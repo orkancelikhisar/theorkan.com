@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASCII Sailing Simulator</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #000;
+    color: #e8e6df;
+    font-family: monospace;
+  }
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
+  #ui {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    pointer-events: none;
+    font-size: 16px;
+    line-height: 1.5;
+    white-space: pre;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+  }
+</style>
+</head>
+<body>
+<div id="ui"></div>
+<canvas id="gameCanvas"></canvas>
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const ui = document.getElementById('ui');
+
+  let width, height;
+  function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Keys
+  const keys = {
+    ArrowUp: false,
+    ArrowDown: false,
+    ArrowLeft: false,
+    ArrowRight: false
+  };
+
+  window.addEventListener('keydown', e => {
+    if (keys.hasOwnProperty(e.code)) {
+      keys[e.code] = true;
+    }
+  });
+  window.addEventListener('keyup', e => {
+    if (keys.hasOwnProperty(e.code)) {
+      keys[e.code] = false;
+    }
+  });
+
+  // Game State
+  const game = {
+    score: 0,
+    level: 1,
+    goalsThisLevel: 0,
+    grid: [],
+    gridWidth: 0,
+    gridHeight: 0,
+    goal: { x: -100, y: -100, radius: 25 }
+  };
+
+  // State
+  const boat = {
+    x: width / 2,
+    y: height / 2,
+    vx: 0,
+    vy: 0,
+    heading: 0, // 0 is pointing up (North), positive is clockwise
+    maxTurnRate: 0.03,
+    speed: 0, 
+    mainsheetAngle: Math.PI / 4, 
+    actualBoomAngle: 0,
+    boomVelocity: 0,
+    rope: null
+  };
+
+  const env = {
+    windHeading: Math.PI, // Wind blows South (down)
+    windSpeed: 2.5 
+  };
+  
+  // Physics constants
+  const MAX_MAINSHEET_ANGLE = Math.PI / 2; 
+  const MIN_MAINSHEET_ANGLE = 0.05; 
+  const WATER_DRAG = 0.015; 
+  
+  const wakeParticles = [];
+  
+  function normalizeAngle(angle) {
+    while (angle > Math.PI) angle -= Math.PI * 2;
+    while (angle < -Math.PI) angle += Math.PI * 2;
+    return angle;
+  }
+
+  function generateIslands() {
+    const cw = 8;
+    const ch = 12;
+    game.gridWidth = Math.ceil(width / cw);
+    game.gridHeight = Math.ceil(height / ch);
+    const gw = game.gridWidth;
+    const gh = game.gridHeight;
+    let grid = new Array(gw * gh).fill(0);
+    
+    const numBlobs = 10 + Math.random() * 8;
+    for(let i=0; i<numBlobs; i++) {
+      let cx = Math.floor(Math.random() * gw);
+      let cy = Math.floor(Math.random() * gh);
+      let r = 4 + Math.random() * 12;
+      for(let dy=-r; dy<=r; dy++) {
+        for(let dx=-r; dx<=r; dx++) {
+          if (dx*dx + dy*dy <= r*r) {
+             let nx = (Math.floor(cx + dx) + gw) % gw;
+             let ny = (Math.floor(cy + dy) + gh) % gh;
+             if (Math.random() < 0.9) grid[ny * gw + nx] = 1;
+          }
+        }
+      }
+    }
+
+    // Cellular Automata smoothing
+    for(let step=0; step<4; step++) {
+      let newGrid = new Array(gw * gh).fill(0);
+      for(let y=0; y<gh; y++) {
+        for(let x=0; x<gw; x++) {
+          let neighbors = 0;
+          for(let dy=-1; dy<=1; dy++) {
+            for(let dx=-1; dx<=1; dx++) {
+              if (dx===0 && dy===0) continue;
+              let nx = (x + dx + gw) % gw;
+              let ny = (y + dy + gh) % gh;
+              neighbors += grid[ny * gw + nx] > 0 ? 1 : 0;
+            }
+          }
+          if (grid[y*gw + x] > 0) {
+            newGrid[y*gw + x] = neighbors >= 3 ? 1 : 0;
+          } else {
+            newGrid[y*gw + x] = neighbors >= 5 ? 1 : 0;
+          }
+        }
+      }
+      grid = newGrid;
+    }
+    
+    // Clear land under boat so we don't spawn stuck
+    let bx = Math.floor(boat.x / cw);
+    let by = Math.floor(boat.y / ch);
+    for(let dy=-5; dy<=5; dy++) {
+      for(let dx=-5; dx<=5; dx++) {
+        let nx = (bx + dx + gw) % gw;
+        let ny = (by + dy + gh) % gh;
+        grid[ny * gw + nx] = 0;
+      }
+    }
+    
+    // Mark shores (cyan borders)
+    for(let y=0; y<gh; y++) {
+      for(let x=0; x<gw; x++) {
+        if (grid[y*gw + x] === 1) {
+          let isShore = false;
+          for(let dy=-1; dy<=1; dy++) {
+            for(let dx=-1; dx<=1; dx++) {
+              let nx = (x + dx + gw) % gw;
+              let ny = (y + dy + gh) % gh;
+              if (grid[ny*gw + nx] === 0) isShore = true;
+            }
+          }
+          if (isShore) grid[y*gw + x] = 2; // 2 = shore
+        }
+      }
+    }
+    game.grid = grid;
+  }
+
+  function spawnGoal() {
+    const gw = game.gridWidth;
+    const gh = game.gridHeight;
+    let valid = false;
+    let attempts = 0;
+    while(!valid && attempts < 1000) {
+      game.goal.x = 50 + Math.random() * (width - 100);
+      game.goal.y = 50 + Math.random() * (height - 100);
+      let gx = Math.floor(game.goal.x / 8);
+      let gy = Math.floor(game.goal.y / 12);
+      valid = true;
+      for(let dy=-4; dy<=4; dy++) {
+        for(let dx=-4; dx<=4; dx++) {
+           let nx = (gx + dx + gw) % gw;
+           let ny = (gy + dy + gh) % gh;
+           if (game.grid[ny * gw + nx] !== 0) valid = false;
+        }
+      }
+      attempts++;
+    }
+  }
+
+  // Initialize first level after short delay to ensure width/height are set
+  setTimeout(() => { generateIslands(); spawnGoal(); }, 100);
+
+  function update() {
+    // Controls
+    // Turn rate is dependent on speed, but we allow some turning at 0 speed for playability
+    const speedFactor = Math.min(1.0, Math.max(0.2, boat.speed / 2));
+    if (keys.ArrowLeft) boat.heading -= boat.maxTurnRate * speedFactor;
+    if (keys.ArrowRight) boat.heading += boat.maxTurnRate * speedFactor;
+    
+    if (keys.ArrowUp) boat.mainsheetAngle = Math.max(MIN_MAINSHEET_ANGLE, boat.mainsheetAngle - 0.03);
+    if (keys.ArrowDown) boat.mainsheetAngle = Math.min(MAX_MAINSHEET_ANGLE, boat.mainsheetAngle + 0.03);
+
+    boat.heading = normalizeAngle(boat.heading);
+
+    // Wind vector
+    const wx = Math.sin(env.windHeading) * env.windSpeed;
+    const wy = -Math.cos(env.windHeading) * env.windSpeed;
+
+    // Boat vector
+    const bx = boat.vx;
+    const by = boat.vy;
+
+    // Apparent wind vector
+    const awx = wx - bx;
+    const awy = wy - by;
+
+    const apparentWindSpeed = Math.sqrt(awx * awx + awy * awy);
+    const apparentWindHeading = normalizeAngle(Math.atan2(awx, -awy));
+
+    // Apparent wind angle relative to boat
+    const awaRelative = normalizeAngle(apparentWindHeading - boat.heading);
+
+    // Boom physics
+    let desiredBoomAngle = normalizeAngle(awaRelative - Math.PI);
+    
+    // Wind torque on boom
+    const boomTorque = apparentWindSpeed * apparentWindSpeed * Math.sin(desiredBoomAngle - boat.actualBoomAngle) * 0.03;
+    boat.boomVelocity += boomTorque;
+    boat.boomVelocity *= 0.85; // Dampening
+    
+    boat.actualBoomAngle += boat.boomVelocity;
+    boat.actualBoomAngle = normalizeAngle(boat.actualBoomAngle);
+    
+    // Mainsheet constraint
+    if (boat.actualBoomAngle > boat.mainsheetAngle) {
+      boat.boomVelocity -= (boat.actualBoomAngle - boat.mainsheetAngle) * 0.3;
+      boat.actualBoomAngle = boat.mainsheetAngle;
+      boat.boomVelocity *= -0.3; // Bounce
+    } else if (boat.actualBoomAngle < -boat.mainsheetAngle) {
+      boat.boomVelocity -= (boat.actualBoomAngle + boat.mainsheetAngle) * 0.3;
+      boat.actualBoomAngle = -boat.mainsheetAngle;
+      boat.boomVelocity *= -0.3; // Bounce
+    }
+
+    // Flat plate sail physics
+    const windRelAngle = awaRelative;
+    const n1 = normalizeAngle(boat.actualBoomAngle + Math.PI / 2);
+    const n2 = normalizeAngle(boat.actualBoomAngle - Math.PI / 2);
+    
+    // Dot products of Wind and Normals
+    const dot1 = Math.cos(windRelAngle - n1);
+    const dot2 = Math.cos(windRelAngle - n2);
+    
+    let forceMagnitude, normalAngle;
+    // We choose the normal that faces away from the wind
+    if (dot1 > 0) {
+      forceMagnitude = apparentWindSpeed * apparentWindSpeed * dot1 * 0.04;
+      normalAngle = n1;
+    } else {
+      forceMagnitude = apparentWindSpeed * apparentWindSpeed * dot2 * 0.04;
+      normalAngle = n2;
+    }
+
+    // Projection onto boat heading (which is angle 0 relative)
+    const forwardForce = forceMagnitude * Math.cos(normalAngle);
+    
+    // Leeway (sideways drift) could be added here using Math.sin(normalAngle), 
+    // but we will keep it simple and assume infinite keel resistance.
+    
+    boat.speed += forwardForce;
+    boat.speed -= boat.speed * WATER_DRAG;
+    
+    boat.vx = Math.sin(boat.heading) * boat.speed;
+    boat.vy = -Math.cos(boat.heading) * boat.speed;
+    
+    boat.x += boat.vx;
+    boat.y += boat.vy;
+
+    if (boat.x < 0) boat.x = width;
+    if (boat.x > width) boat.x = 0;
+    if (boat.y < 0) boat.y = height;
+    if (boat.y > height) boat.y = 0;
+
+    // Goal Collision
+    if (Math.hypot(boat.x - game.goal.x, boat.y - game.goal.y) < game.goal.radius + 15) {
+      game.score++;
+      game.goalsThisLevel++;
+      if (game.goalsThisLevel >= 10) {
+        game.level++;
+        game.goalsThisLevel = 0;
+        generateIslands(); // Instant generation without fading
+      }
+      spawnGoal();
+    }
+
+    // Island Map Collision
+    let collided = false;
+    let pushX = 0, pushY = 0;
+    const br = 12; // Boat radius
+    const gw = game.gridWidth;
+    const gh = game.gridHeight;
+    for(let dy=-br; dy<=br; dy+=4) {
+      for(let dx=-br; dx<=br; dx+=4) {
+        if (dx*dx + dy*dy <= br*br) {
+           let gx = Math.floor((boat.x + dx) / 8);
+           let gy = Math.floor((boat.y + dy) / 12);
+           gx = (gx + gw) % gw;
+           gy = (gy + gh) % gh;
+           if (game.grid[gy * gw + gx] !== 0) {
+              collided = true;
+              let cellCX = gx * 8 + 4;
+              let cellCY = gy * 12 + 6;
+              let pdx = boat.x - cellCX;
+              let pdy = boat.y - cellCY;
+              if (pdx > width/2) pdx -= width; else if (pdx < -width/2) pdx += width;
+              if (pdy > height/2) pdy -= height; else if (pdy < -height/2) pdy += height;
+              pushX += pdx;
+              pushY += pdy;
+           }
+        }
+      }
+    }
+    if (collided) {
+       let mag = Math.hypot(pushX, pushY);
+       if (mag > 0.1) {
+         pushX /= mag; pushY /= mag;
+       } else {
+         pushX = 1; pushY = 0;
+       }
+       boat.x += pushX * 2;
+       boat.y += pushY * 2;
+       boat.vx *= 0.3; boat.vy *= 0.3; boat.speed *= 0.3;
+    }
+
+    // Wake Particles (Stern wake)
+    if (!boat.rope) {
+      boat.rope = [];
+      for(let i=0; i<7; i++) boat.rope.push({x:0, y:15, old_x:0, old_y:15});
+    }
+
+    const maxBoomEndX = -32 * Math.sin(boat.mainsheetAngle);
+    const maxBoomEndY = -5 + 32 * Math.cos(boat.mainsheetAngle);
+    const ropeDx = maxBoomEndX - 0;
+    const ropeDy = maxBoomEndY - 15;
+    const R_max = Math.sqrt(ropeDx*ropeDx + ropeDy*ropeDy);
+    const segmentLength = R_max / (boat.rope.length - 1);
+
+    const cosH = Math.cos(boat.heading);
+    const sinH = Math.sin(boat.heading);
+    const awx_local = awx * cosH + awy * sinH;
+    const awy_local = -awx * sinH + awy * cosH;
+
+    for (let i = 1; i < boat.rope.length - 1; i++) {
+      const p = boat.rope[i];
+      const vx = p.x - p.old_x;
+      const vy = p.y - p.old_y;
+      p.old_x = p.x;
+      p.old_y = p.y;
+      p.x += vx * 0.92 + awx_local * 0.02;
+      p.y += vy * 0.92 + awy_local * 0.02;
+    }
+
+    const boomEndX = -32 * Math.sin(boat.actualBoomAngle);
+    const boomEndY = -5 + 32 * Math.cos(boat.actualBoomAngle);
+    
+    boat.rope[0].x = 0; boat.rope[0].y = 15; // Cockpit
+    boat.rope[boat.rope.length-1].x = boomEndX;
+    boat.rope[boat.rope.length-1].y = boomEndY;
+
+    for (let iter = 0; iter < 5; iter++) {
+      for (let i = 0; i < boat.rope.length - 1; i++) {
+        const p1 = boat.rope[i];
+        const p2 = boat.rope[i+1];
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > segmentLength) {
+          const diff = segmentLength - dist;
+          const percent = diff / dist / 2;
+          const offsetX = dx * percent;
+          const offsetY = dy * percent;
+          if (i !== 0) { p1.x -= offsetX; p1.y -= offsetY; }
+          if (i+1 !== boat.rope.length-1) { p2.x += offsetX; p2.y += offsetY; }
+        }
+      }
+    }
+
+    // Wake Particles (Stern wake)
+    if (boat.speed > 0.3) {
+      const sternX = boat.x - 17.5 * Math.sin(boat.heading);
+      const sternY = boat.y + 17.5 * Math.cos(boat.heading);
+      
+      // Spawn particles occasionally based on speed
+      if (Math.random() < boat.speed * 0.5) {
+        // Port side wake
+        wakeParticles.push({
+          x: sternX + (Math.random() - 0.5) * 5,
+          y: sternY + (Math.random() - 0.5) * 5,
+          vx: Math.sin(boat.heading - Math.PI/3) * (Math.random() * 0.4),
+          vy: -Math.cos(boat.heading - Math.PI/3) * (Math.random() * 0.4),
+          life: 1.0 + Math.random() * 0.5
+        });
+        // Starboard side wake
+        wakeParticles.push({
+          x: sternX + (Math.random() - 0.5) * 5,
+          y: sternY + (Math.random() - 0.5) * 5,
+          vx: Math.sin(boat.heading + Math.PI/3) * (Math.random() * 0.4),
+          vy: -Math.cos(boat.heading + Math.PI/3) * (Math.random() * 0.4),
+          life: 1.0 + Math.random() * 0.5
+        });
+      }
+    }
+
+    // Update wake particles
+    for (let i = wakeParticles.length - 1; i >= 0; i--) {
+      const p = wakeParticles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= 0.03;
+      if (p.life <= 0) {
+        wakeParticles.splice(i, 1);
+      }
+    }
+
+    ui.innerHTML = `
+      ASCII Sailing Simulator
+      -----------------------
+      Level: ${game.level}
+      Goals: ${game.goalsThisLevel} / 10
+      Score: ${game.score}
+      -----------------------
+      Speed: ${(boat.speed * 10).toFixed(1)} kts
+      Heading: ${(normalizeAngle(boat.heading) * 180 / Math.PI).toFixed(0)}°
+      True Wind: ${(env.windSpeed * 10).toFixed(1)} kts @ ${(env.windHeading * 180 / Math.PI).toFixed(0)}°
+      App. Wind: ${(apparentWindSpeed * 10).toFixed(1)} kts @ ${(apparentWindHeading * 180 / Math.PI).toFixed(0)}°
+      Mainsheet: ${(boat.mainsheetAngle * 180 / Math.PI).toFixed(0)}°
+      Boom: ${(boat.actualBoomAngle * 180 / Math.PI).toFixed(0)}°
+      
+      Controls:
+      < >  Steer
+      ^ v  Mainsheet
+    `.replace(/^\s+/gm, '');
+  }
+
+  function drawMap() {
+    const gw = game.gridWidth;
+    const gh = game.gridHeight;
+    if (gw === 0) return;
+    ctx.font = '12px monospace';
+    for(let y=0; y<gh; y++) {
+      for(let x=0; x<gw; x++) {
+        let cell = game.grid[y*gw + x];
+        if (cell === 1) {
+          ctx.fillStyle = '#3a3935'; // bone-faint (was dark green)
+          let char = (x*y)%3 === 0 ? '"' : ( (x+y)%2===0 ? ',' : ';' );
+          ctx.fillText(char, x*8+4, y*12+6);
+        } else if (cell === 2) {
+          ctx.fillStyle = '#a8a59c'; // bright bone (was cyan shore)
+          ctx.fillText('~', x*8+4, y*12+6);
+        }
+      }
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw Map
+    drawMap();
+
+    // Draw Raki Goal
+    if (game.goal.x > 0) {
+      const gx = game.goal.x;
+      const gy = game.goal.y;
+      
+      const goalPulse = 0.5 + 0.5 * Math.sin(Date.now() / 200);
+      ctx.globalAlpha = 0.8 + 0.2 * goalPulse;
+      ctx.font = 'bold 16px monospace';
+      
+      ctx.fillStyle = '#e8e6df';
+      ctx.fillText('\\   /', gx, gy - 20);
+      ctx.fillText(' | | ', gx, gy - 10);
+      ctx.fillStyle = '#d8d5cc';
+      ctx.fillText(' |*| ', gx, gy);
+      ctx.fillText(' |*| ', gx, gy + 10);
+      ctx.fillStyle = '#e8e6df';
+      ctx.fillText(' --- ', gx, gy + 20);
+      
+      ctx.globalAlpha = 1.0;
+    }
+
+    ctx.fillStyle = '#e8e6df';
+
+    // Wind particles
+    ctx.font = '14px monospace';
+    const time = Date.now() / 1000;
+    for (let i = 0; i < 60; i++) {
+      const wx = (i * 123 + time * env.windSpeed * 20 * Math.sin(env.windHeading)) % width;
+      const wy = (i * 321 - time * env.windSpeed * 20 * Math.cos(env.windHeading)) % height;
+      
+      let drawX = wx < 0 ? wx + width : wx;
+      let drawY = wy < 0 ? wy + height : wy;
+      
+      ctx.globalAlpha = 0.3;
+      ctx.fillText('~', drawX, drawY);
+    }
+    
+    // Draw Wake Particles
+    ctx.font = '12px monospace';
+    for (const p of wakeParticles) {
+      ctx.globalAlpha = p.life * 0.5;
+      ctx.fillStyle = '#88857c';
+      ctx.fillText(',', p.x, p.y);
+    }
+    ctx.globalAlpha = 1.0;
+
+    // Boat
+    ctx.save();
+    ctx.fillStyle = '#e8e6df';
+    ctx.translate(boat.x, boat.y);
+    ctx.rotate(boat.heading);
+    ctx.scale(0.7, 0.7); // Scale boat visual down by 30%
+
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText('^', 0, -25);
+    ctx.font = '16px monospace';
+    ctx.fillText('/ \\', 0, -15);
+    ctx.fillText('| |', 0, -5);
+    ctx.fillText('| |', 0, 5);
+    ctx.fillText('\\ /', 0, 15);
+    ctx.fillText('v', 0, 25);
+
+    // Mast
+    ctx.fillText('*', 0, -5);
+
+    // Boom
+    ctx.save();
+    ctx.translate(0, -5);
+    ctx.rotate(boat.actualBoomAngle);
+    
+    // Draw boom line
+    for (let i = 1; i <= 4; i++) {
+      ctx.fillText('|', 0, i * 8); 
+    }
+    
+    // Draw Sail (Simplified ASCII representation)
+    ctx.fillStyle = '#88857c';
+    for(let i=1; i<=5; i++) {
+       ctx.globalAlpha = 0.5;
+       ctx.fillText('(', 4, i * 7);
+       ctx.globalAlpha = 1.0;
+    }
+    ctx.fillStyle = '#e8e6df';
+
+    ctx.restore(); // Restore to boat local space
+    
+    // Draw Mainsheet Rope
+    ctx.fillStyle = '#5a5854';
+    ctx.font = '12px monospace';
+    for(let i=1; i<boat.rope.length-1; i++) {
+       ctx.fillText('.', boat.rope[i].x, boat.rope[i].y);
+    }
+
+    ctx.restore(); // Restore to global space
+    
+    // Wind Direction Indicator (Top Right)
+    const indicatorX = width - 80;
+    const indicatorY = 80;
+    
+    ctx.fillStyle = '#e8e6df';
+    ctx.font = '16px monospace';
+    ctx.fillText('WIND', indicatorX, indicatorY - 45);
+    
+    ctx.globalAlpha = 0.5;
+    ctx.fillText('N', indicatorX, indicatorY - 25);
+    ctx.fillText('S', indicatorX, indicatorY + 25);
+    ctx.fillText('W', indicatorX - 25, indicatorY);
+    ctx.fillText('E', indicatorX + 25, indicatorY);
+    ctx.globalAlpha = 1.0;
+    
+    ctx.save();
+    ctx.translate(indicatorX, indicatorY);
+    ctx.rotate(env.windHeading);
+    ctx.font = 'bold 20px monospace';
+    ctx.fillText('v', 0, 15);
+    ctx.fillText('|', 0, 5);
+    ctx.fillText('|', 0, -5);
+    ctx.fillText('|', 0, -15);
+    ctx.restore();
+  }
+
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  loop();
+</script>
+</body>
+</html>
