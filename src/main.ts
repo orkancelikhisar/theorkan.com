@@ -213,6 +213,7 @@ async function main(): Promise<void> {
         : modalProgram.name === '2048' ? '.t2048-overlay'
         : modalProgram.name === 'life' ? '.life-overlay'
         : modalProgram.name === 'regatta' ? '.regatta-overlay'
+        : modalProgram.name === 'gallery' ? '.gallery-overlay'
         : null;
       const overlayPresent = overlayClass ? document.querySelector(overlayClass) : null;
       if (overlayPresent) {

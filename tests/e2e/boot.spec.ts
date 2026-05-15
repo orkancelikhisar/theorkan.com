@@ -79,6 +79,36 @@ test('pinpoint prints a signature and uniqueness estimate', async ({ page }) => 
   await expect(page.locator('.terminal')).toContainText('you are 1 in', { timeout: 8_000 });
 });
 
+test('gallery opens, navigates, and quits with q', async ({ page }) => {
+  await page.goto('/');
+  await waitForBootReady(page);
+  await page.keyboard.press('Enter');
+  await waitForReadyTerminal(page);
+  await page.locator('.terminal__input').focus();
+  await page.keyboard.type('gallery');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.gallery-overlay')).toBeVisible({ timeout: 5_000 });
+  // Should show first piece by default.
+  await expect(page.locator('.gallery-frame__title')).toContainText('(', { timeout: 3_000 });
+  // Arrow right advances to next piece; counter should change from 01/10 → 02/10.
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.gallery-frame__chrome')).toContainText('02', { timeout: 2_000 });
+  await page.keyboard.press('q');
+  await expect(page.locator('.gallery-overlay')).toBeHidden({ timeout: 2_000 });
+});
+
+test('music ls lists the tracks', async ({ page }) => {
+  await page.goto('/');
+  await waitForBootReady(page);
+  await page.keyboard.press('Enter');
+  await waitForReadyTerminal(page);
+  await page.locator('.terminal__input').focus();
+  await page.keyboard.type('music ls');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.terminal')).toContainText('harbor', { timeout: 5_000 });
+  await expect(page.locator('.terminal')).toContainText('tuesday', { timeout: 5_000 });
+});
+
 test('regatta launches and quits cleanly', async ({ page }) => {
   await page.goto('/');
   await waitForBootReady(page);

@@ -13,7 +13,7 @@ const THREAD_MAN: Record<string, string[]> = {
   'the wind':     ['WIND(7)', '', '/dev/wind. it shifts. it lies a little.'],
   'the stowaway': ['STOWAWAY(7)', '', 'he is in /var/log/observers.log.', 'he runs `pinpoint`. also: `whois stowaway`.'],
   'the poems':    ['POEMS(7)', '', '/usr/share/poems/. mostly empty. he fills it as he is fed.'],
-  'the gallery':  ['GALLERY(7)', '', 'arrives v0.4. ascii rederings of orkan\'s works.'],
+  'the gallery':  ['GALLERY(7)', '', '`gallery`. ten ascii pieces from orkan\'s portfolio.', 'arrow keys to navigate. q to quit.', '', 'related: `latent`, `currency`, `music`.'],
   'the noticeboard': ['NOTICEBOARD(7)', '', '`bbs`. old messages, kept on purpose.'],
 };
 
