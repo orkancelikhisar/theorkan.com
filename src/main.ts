@@ -20,6 +20,8 @@ import { installKonami } from './programs/easter/konami';
 import { createPanelManager } from './kernel/panels';
 import './kernel/panels.css';
 import { requestEyesCamera } from './eyes/camera';
+import { createDilenci, type DilenciAPI } from './dilenci/dilenci';
+import { createLlmAdapter } from './dilenci/llm';
 import type { Program, ProgramContext, KeyEvent } from './kernel/program';
 
 async function main(): Promise<void> {
@@ -89,7 +91,7 @@ async function main(): Promise<void> {
       stop: () => {},
       volume: () => {},
     },
-    dilenci: { notify: () => {} },
+    dilenci: { notify: (n, p) => dilenci?.notify(n, p) },
     events: {
       on: (n, cb) => events.on(n, cb),
       emit: (n, p) => events.emit(n, p),
@@ -119,6 +121,24 @@ async function main(): Promise<void> {
   // Listen for shell:program-modal to capture modal program reference for key routing.
   // Since shell.run() invokes program.init() which spawns the modal overlay, but we
   // also need to route keys to it — intercept by checking registry mode on submit.
+
+  // Dilenci — the abandoned alter-ego. Lazy-loaded LLM; falls back to seeds.
+  // The daemon is instantiated immediately so it can subscribe to events, but
+  // the LLM worker is created in the background and the daemon happily runs in
+  // seed-only mode if it never resolves.
+  let dilenci: DilenciAPI | null = null;
+  window.setTimeout(() => {
+    const llm = createLlmAdapter();
+    dilenci = createDilenci({
+      events, fs, voidApi, audio, terminal,
+      container: document.body,
+      llm: llm ?? undefined,
+    });
+    llm?.onReady(() => terminal.println('postmodern_dilenci awoke quietly.', { dim: true }));
+    llm?.onFailed(() => { /* silent failure per §8.3 */ });
+    // Expose for the dilenci shell command without dragging dilenci into ctx.
+    (globalThis as unknown as { __dilenci?: DilenciAPI }).__dilenci = dilenci;
+  }, 2_000);
 
   // Konami fireworks
   installKonami(events);
@@ -155,6 +175,13 @@ async function main(): Promise<void> {
     audio.play('shell.enter', 'shell');
     voidApi.shine();
 
+    // Dilenci offer mode intercepts the submit before the shell sees it.
+    if (dilenci?.isInOfferMode()) {
+      dilenci.feedFromOfferLine(line);
+      refreshPrompt();
+      return;
+    }
+
     // Detect modal launch
     const cmd = line.trim().split(/\s+/)[0];
     const prog = registry.get(cmd);
@@ -162,6 +189,7 @@ async function main(): Promise<void> {
       setModal(prog);
     }
 
+    events.emit('shell:command', { line });
     await shell.run(line);
     refreshPrompt();
     events.emit('shell:active', null);
@@ -188,6 +216,15 @@ async function main(): Promise<void> {
       } else {
         setModal(null);
       }
+    }
+
+    // Esc while Dilenci is asking for an offer → graceful refusal.
+    if (e.key === 'Escape' && dilenci?.isInOfferMode()) {
+      e.preventDefault();
+      dilenci.escapeOffer();
+      terminal.setInputValue('');
+      refreshPrompt();
+      return;
     }
 
     if (e.key === 'ArrowUp') {

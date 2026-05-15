@@ -1,0 +1,76 @@
+/* Dilenci appearance panel (§8.6).
+   Small, upper-right, bone-on-void, soft-fade. The whole thing is one beat —
+   the room shifts, a line lands, and either you offer or it folds away. */
+
+.dilenci-panel {
+  position: fixed;
+  top: 32px;
+  right: 32px;
+  width: 28ch;
+  max-width: calc(100vw - 64px);
+  z-index: 50;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--bone);
+  background: var(--void);
+  border: 1px solid var(--bone-faint);
+  padding: 10px 12px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 320ms ease, transform 320ms ease;
+}
+
+.dilenci-panel.is-open {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.dilenci-panel__prefix {
+  display: block;
+  color: var(--bone-dim);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.dilenci-panel__face {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  margin: 2px 0 10px;
+  color: var(--bone-dim);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.dilenci-panel__eye {
+  display: inline-block;
+  min-width: 1ch;
+  text-align: center;
+  transition: color 240ms ease, opacity 240ms ease;
+}
+
+.dilenci-panel__eye.is-blink {
+  color: var(--void);
+  opacity: 0;
+}
+
+.dilenci-panel__face.is-alert  { color: var(--bone); }
+.dilenci-panel__face.is-happy  { color: var(--bone); }
+.dilenci-panel__face.is-sad    { color: var(--bone-faint); }
+.dilenci-panel__face.is-drift  { color: var(--bone-dim); opacity: 0.7; }
+
+.dilenci-panel__line {
+  display: block;
+  white-space: pre-wrap;
+}
+
+.dilenci-panel__hint {
+  display: block;
+  margin-top: 8px;
+  color: var(--bone-faint);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
