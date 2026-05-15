@@ -30,13 +30,14 @@ export function createTerminal(root: HTMLElement): TerminalAPI {
   const promptEl = document.createElement('span');
   promptEl.className = 'terminal__prompt';
   promptEl.textContent = 'orkan@theorkan:~$ ';
-  const inputEl = document.createElement('span');
+  const inputEl = document.createElement('input');
+  inputEl.type = 'text';
   inputEl.className = 'terminal__input';
-  inputEl.contentEditable = 'plaintext-only';
   inputEl.spellcheck = false;
-  const cursorEl = document.createElement('span');
-  cursorEl.className = 'terminal__cursor';
-  promptLine.append(promptEl, inputEl, cursorEl);
+  inputEl.autocomplete = 'off';
+  inputEl.setAttribute('autocapitalize', 'off');
+  inputEl.setAttribute('autocorrect', 'off');
+  promptLine.append(promptEl, inputEl);
   term.appendChild(promptLine);
 
   let mode: 'shell' | 'offer' | 'modal' = 'shell';
@@ -48,8 +49,8 @@ export function createTerminal(root: HTMLElement): TerminalAPI {
     if (e.defaultPrevented) return;
     if (e.key === 'Enter') {
       e.preventDefault();
-      const line = inputEl.textContent || '';
-      inputEl.textContent = '';
+      const line = inputEl.value;
+      inputEl.value = '';
       const archived = document.createElement('div');
       archived.className = 'terminal__line';
       archived.textContent = `${promptEl.textContent}${line}`;
@@ -59,10 +60,14 @@ export function createTerminal(root: HTMLElement): TerminalAPI {
     }
   });
 
-  // Focus management — clicking anywhere refocuses the input
+  // Focus management — clicking anywhere refocuses the input, except inside
+  // modal overlays / panels where the user is interacting elsewhere.
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement | null;
-    if (target && target.closest('.snake-overlay, .t2048-overlay, .stowaway-flash')) return;
+    if (target && target.closest(
+      '.snake-overlay, .t2048-overlay, .life-overlay, .regatta-overlay, ' +
+      '.stowaway-flash, .panel, .panel__close',
+    )) return;
     inputEl.focus();
   });
   inputEl.focus();
@@ -93,16 +98,11 @@ export function createTerminal(root: HTMLElement): TerminalAPI {
     onSubmit(cb) { submitListeners.push(cb); },
     onKey(cb) { keyListeners.push(cb); },
     getInputElement() { return inputEl; },
-    getInputValue() { return inputEl.textContent || ''; },
+    getInputValue() { return inputEl.value; },
     setInputValue(v) {
-      inputEl.textContent = v;
-      // place cursor at end
-      const range = document.createRange();
-      const sel = window.getSelection();
-      range.selectNodeContents(inputEl);
-      range.collapse(false);
-      sel?.removeAllRanges();
-      sel?.addRange(range);
+      inputEl.value = v;
+      // place caret at end
+      inputEl.setSelectionRange(v.length, v.length);
     },
     focus() { inputEl.focus(); },
   };

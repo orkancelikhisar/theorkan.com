@@ -43,18 +43,32 @@ export class RegattaRenderer {
 
     const speedKt = magnitude(state.velocity) / KT_TO_MS;
 
-    // --- sea texture (scrolling) ---
+    // --- sea texture (scrolls 1:1 with world so motion is obvious) ---
     this.scrollOffsetMs += dtMs;
-    c.fillStyle = '#3a3935';
-    const sx = (-state.position.x * PX_PER_M * 0.3 + this.scrollOffsetMs * 0.0001 * state.trueWindKt) % 18;
-    const sy = (state.position.y * PX_PER_M * 0.3) % 18;
-    for (let yi = -1; yi < VIEW_H / 18 + 2; yi++) {
-      for (let xi = -1; xi < VIEW_W / 18 + 2; xi++) {
-        const px = xi * 18 + sx;
-        const py = yi * 18 + sy;
-        if (Math.random() < 0.97) c.fillRect(px, py, 1, 1);
-        if ((xi + yi) % 2 === 0) c.fillRect(px + 9, py + 9, 1, 1);
+    const TILE = 22;
+    const sx = ((-state.position.x * PX_PER_M) % TILE + TILE) % TILE;
+    const sy = ((state.position.y  * PX_PER_M) % TILE + TILE) % TILE;
+    c.fillStyle = '#5e5c54';
+    for (let yi = -1; yi < VIEW_H / TILE + 2; yi++) {
+      for (let xi = -1; xi < VIEW_W / TILE + 2; xi++) {
+        const px = xi * TILE + sx;
+        const py = yi * TILE + sy;
+        c.fillRect(px, py, 1, 1);
+        if ((xi + yi) % 2 === 0) c.fillRect(px + 11, py + 11, 1, 1);
       }
+    }
+    // Long wave streaks aligned with wind, drifting downwind. Two layers at
+    // different depths so parallax sells the motion even at very low boat speed.
+    c.fillStyle = '#3a3935';
+    const wAngle = deg2rad(state.trueWindDeg);
+    const wsx = Math.sin(wAngle), wsy = -Math.cos(wAngle);
+    for (let i = 0; i < 18; i++) {
+      const phase = (this.scrollOffsetMs * 0.025 * state.trueWindKt + i * 137) % (VIEW_W + VIEW_H);
+      const ox = ((i * 73) % VIEW_W) + wsx * phase;
+      const oy = ((i * 41) % VIEW_H) + wsy * phase;
+      c.fillRect(((ox % VIEW_W) + VIEW_W) % VIEW_W,
+                 ((oy % VIEW_H) + VIEW_H) % VIEW_H,
+                 4, 1);
     }
 
     // --- wind ripples ---
@@ -100,15 +114,19 @@ export class RegattaRenderer {
     c.globalAlpha = 1;
     this.particles = this.particles.filter((p) => p.age < p.life);
 
-    // --- spawn wake (behind boat) ---
-    if (speedKt > 0.5) {
-      const sternX = VIEW_W / 2 - Math.sin(deg2rad(state.heading)) * 6;
-      const sternY = VIEW_H / 2 + Math.cos(deg2rad(state.heading)) * 6;
-      this.particles.push({ x: sternX, y: sternY, vx: 0, vy: 0, age: 0, life: 2000, kind: 'wake' });
+    // --- spawn wake (behind boat) — multiple per frame at higher speeds ---
+    if (speedKt > 0.2) {
+      const sternCount = Math.max(1, Math.floor(speedKt));
+      for (let i = 0; i < sternCount; i++) {
+        const jitter = (Math.random() - 0.5) * 2;
+        const sternX = VIEW_W / 2 - Math.sin(deg2rad(state.heading)) * (6 + i * 1.5) + jitter;
+        const sternY = VIEW_H / 2 + Math.cos(deg2rad(state.heading)) * (6 + i * 1.5) + jitter;
+        this.particles.push({ x: sternX, y: sternY, vx: 0, vy: 0, age: 0, life: 2400, kind: 'wake' });
+      }
     }
 
-    // --- spawn bow wave ---
-    if (speedKt > 1.5) {
+    // --- spawn bow wave (lower threshold so slow boats also have it) ---
+    if (speedKt > 0.6) {
       const sp = Math.min(5, Math.floor(speedKt));
       for (let i = 0; i < sp; i++) {
         const bowX = VIEW_W / 2 + Math.sin(deg2rad(state.heading)) * 6;

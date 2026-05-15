@@ -1,5 +1,25 @@
+.aquarium-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.aquarium-controls {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.aquarium-btn {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--bone-dim);
+  background: transparent;
+  border: 1px solid var(--bone-faint);
+  padding: 2px 6px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+}
+.aquarium-btn:hover { color: var(--bone); border-color: var(--bone-dim); }
+.aquarium-btn--active { color: var(--bone); border-color: var(--bone); }
 .aquarium-canvas {
-  width: 100%;
-  height: 100%;
   display: block;
 }

@@ -62,9 +62,9 @@ export function initialState(now: number): RegattaState {
     luffing: false,
 
     trueWindDeg: startDeg,
-    trueWindKt: 6,
+    trueWindKt: 15,
     windTargetDeg: startDeg,
-    windTargetKt: 6,
+    windTargetKt: 15,
     nextShiftAt: now + 25_000,
     gustUntil: 0,
 
