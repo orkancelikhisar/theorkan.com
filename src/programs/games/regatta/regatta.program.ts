@@ -1,110 +1,73 @@
 import './regatta.css';
-import type { Program, KeyEvent } from '../../../kernel/program';
-import { initialState, type RegattaState } from './state';
-import { updateRegatta } from './update';
-import { RegattaRenderer } from './render';
+import type { Program } from '../../../kernel/program';
 
-interface Active {
-  overlay: HTMLElement;
-  canvas: HTMLCanvasElement;
-  tutorial: HTMLElement | null;
-  state: RegattaState;
-  renderer: RegattaRenderer;
-  raf: number;
-  lastFrameMs: number;
-  paused: boolean;
-}
+// The regatta game lives as a static asset at public/games/regatta.html.
+// This program opens a full-viewport overlay with that file in an iframe,
+// keeping the OS shell experience intact (no new browser window).
 
-let active: Active | null = null;
-
-function tutorialEl(): HTMLElement {
-  const el = document.createElement('div');
-  el.className = 'regatta-tutorial';
-  el.textContent = [
-    'the wind is from the northeast. you cannot sail directly into it.',
-    'to go north, you must tack — zigzag, alternating sides.',
-    'your sail is the engine. trim it to roughly half the wind angle.',
-    '',
-    '←  →  rudder.    ↑  ↓  sail.    space pause / start.    q quit.',
-    '',
-    'press space to start.',
-  ].join('\n');
-  return el;
-}
-
-function frame(now: number): void {
-  if (!active) return;
-  const dt = Math.min(50, now - active.lastFrameMs);
-  active.lastFrameMs = now;
-  if (!active.paused && !active.state.showTutorial) {
-    updateRegatta(active.state, now, dt);
-  }
-  active.renderer.draw(active.state, dt);
-  active.raf = requestAnimationFrame(frame);
-}
+let overlay: HTMLDivElement | null = null;
+let escListener: ((e: KeyboardEvent) => void) | null = null;
 
 function close(): void {
-  if (!active) return;
-  cancelAnimationFrame(active.raf);
-  active.overlay.remove();
-  if (active.tutorial) active.tutorial.remove();
-  active = null;
+  if (overlay) overlay.remove();
+  overlay = null;
+  if (escListener) {
+    window.removeEventListener('keydown', escListener, true);
+    escListener = null;
+  }
 }
 
 const prog: Program = {
   name: 'regatta',
-  manpage: 'regatta — single-handed dinghy. real sailing physics. tribute to the 2024 arkas aegean.',
+  manpage: 'regatta — single-handed sailing simulator. ← → steer, ↑ ↓ mainsheet. esc/× to quit.',
   category: 'game',
   mode: 'modal',
   init: () => {
-    const overlay = document.createElement('div');
+    if (overlay) return;
+    overlay = document.createElement('div');
     overlay.className = 'regatta-overlay';
-    const canvas = document.createElement('canvas');
-    canvas.className = 'regatta-canvas';
-    overlay.appendChild(canvas);
+
+    const iframe = document.createElement('iframe');
+    iframe.className = 'regatta-iframe';
+    iframe.src = 'games/regatta.html';
+    iframe.title = 'regatta';
+    overlay.appendChild(iframe);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'regatta-close';
+    closeBtn.type = 'button';
+    closeBtn.textContent = '× quit';
+    closeBtn.title = 'quit (esc)';
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      close();
+    });
+    overlay.appendChild(closeBtn);
+
     document.body.appendChild(overlay);
 
-    const renderer = new RegattaRenderer(canvas);
-    const state = initialState(performance.now());
+    // Give the iframe focus so arrow keys reach the game immediately.
+    iframe.addEventListener('load', () => {
+      try { iframe.contentWindow?.focus(); } catch { /* ignore */ }
+    });
 
-    const tutorial = tutorialEl();
-    document.body.appendChild(tutorial);
-
-    active = {
-      overlay, canvas, tutorial, state, renderer,
-      raf: 0, lastFrameMs: performance.now(), paused: false,
-    };
-    active.raf = requestAnimationFrame(frame);
-  },
-  onKey: (_ctx, key: KeyEvent) => {
-    if (!active) return;
-    if (key.key === 'q' || key.key === 'Escape') { close(); return; }
-
-    if (active.state.showTutorial) {
-      if (key.key === ' ' || key.key === 'Spacebar') {
-        active.state.showTutorial = false;
-        active.state.startMs = performance.now();
-        active.tutorial?.remove();
-        active.tutorial = null;
+    // Listen for Esc at the capture phase. The iframe's own keydown handler
+    // doesn't intercept Esc (game uses arrows only), so this works regardless
+    // of whether focus is in the parent or the iframe.
+    escListener = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
       }
-      return;
-    }
-
-    if (key.key === ' ' || key.key === 'Spacebar') { active.paused = !active.paused; return; }
-
-    if (key.key === 'ArrowLeft')  active.state.rudderIntent = -1;
-    if (key.key === 'ArrowRight') active.state.rudderIntent = 1;
-    if (key.key === 'ArrowUp')    active.state.sheetIntent = 1;
-    if (key.key === 'ArrowDown')  active.state.sheetIntent = -1;
+    };
+    window.addEventListener('keydown', escListener, true);
   },
-  render: () => { /* RAF-driven in frame() */ },
+  // The iframe handles its own input. These stubs satisfy the modal contract
+  // tested in registry.test.ts; the kernel's modal key-router calls them as
+  // no-ops while the iframe has focus.
+  onKey: () => { /* no-op — keys flow into the iframe */ },
+  render: () => { /* no-op — iframe drives its own RAF loop */ },
   cleanup: () => close(),
 };
-
-window.addEventListener('keyup', (e) => {
-  if (!active) return;
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') active.state.rudderIntent = 0;
-  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') active.state.sheetIntent = 0;
-});
 
 export default prog;

@@ -64,6 +64,7 @@ test('regatta launches and quits cleanly', async ({ page }) => {
   await page.keyboard.type('regatta');
   await page.keyboard.press('Enter');
   await expect(page.locator('.regatta-overlay')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.press('q');
+  // The game runs inside an iframe that captures keys; quit via the × button.
+  await page.locator('.regatta-close').click();
   await expect(page.locator('.regatta-overlay')).toBeHidden({ timeout: 2_000 });
 });
