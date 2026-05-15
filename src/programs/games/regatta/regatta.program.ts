@@ -20,6 +20,11 @@ function close(): void {
     window.removeEventListener('message', msgListener);
     msgListener = null;
   }
+  // Return focus to the terminal — when the iframe is removed the browser
+  // strands focus on document.body, so the next keystroke doesn't land in
+  // the prompt until the user clicks. Refocus immediately.
+  const input = document.querySelector('.terminal__input');
+  if (input instanceof HTMLElement) input.focus();
 }
 
 const prog: Program = {

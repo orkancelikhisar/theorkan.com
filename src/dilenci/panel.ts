@@ -15,16 +15,7 @@ const PREFIXES = [
   '· something in /var ·',
 ];
 
-// Eye states are a single grapheme each. The "drift" letters are pulled from
-// fragments of poems orkan once half-wrote, so each blink shows a different
-// scrap of language briefly before settling back to a dot.
-const EYE_DEFAULT = '●';
-const EYE_HAPPY = '^';
-const EYE_SAD = '·';
-const EYE_ALERT = '◉';
-const DRIFT_LETTERS = ['a', 'e', 'i', 'o', 'u', 'r', 's', 'l', 'n', 'm', 't'];
-
-export type DilenciExpression = 'default' | 'alert' | 'happy' | 'sad';
+export type DilenciExpression = 'default' | 'alert' | 'happy' | 'sad' | 'thinking';
 
 export interface DilenciPanelAPI {
   open(line: string, hint?: string): void;
@@ -35,6 +26,79 @@ export interface DilenciPanelAPI {
   destroy(): void;
 }
 
+// ── Procedural ASCII eye ─────────────────────────────────────────────────────
+// Renders an almond-shaped eye into a fixed-size char grid. The pupil moves
+// within the iris based on `lookX`/`lookY` in [-1, 1]; `blink` collapses the
+// vertical opening from 0 (open) to 1 (closed). Each repaint is one string;
+// we render that into a <pre> tag.
+
+const EYE_W = 29;
+const EYE_H = 9;
+const ASPECT_Y = 1.7;             // monospace chars are ~1.7x taller than wide
+const LID_HALF_W = 12;
+const LID_HALF_H_OPEN = 3.6;
+const IRIS_R = 2.6;
+const PUPIL_R = 0.9;
+const MAX_PUPIL_OFFSET_X = 2.4;
+const MAX_PUPIL_OFFSET_Y = 1.1;
+
+interface EyeState {
+  lookX: number;       // [-1, 1]
+  lookY: number;       // [-1, 1]
+  blink: number;       // [0, 1]
+  dilation: number;    // 0.7 (squint) .. 1.3 (wide)
+}
+
+function renderEye(s: EyeState): string {
+  const lidH = LID_HALF_H_OPEN * Math.max(0.05, 1 - s.blink) * s.dilation;
+  const lidW = LID_HALF_W * (0.85 + 0.15 * s.dilation);
+  const irisR = IRIS_R * s.dilation;
+  const cx = (EYE_W - 1) / 2;
+  const cy = (EYE_H - 1) / 2;
+  const offX = s.lookX * MAX_PUPIL_OFFSET_X;
+  const offY = s.lookY * MAX_PUPIL_OFFSET_Y;
+
+  let out = '';
+  for (let r = 0; r < EYE_H; r++) {
+    for (let c = 0; c < EYE_W; c++) {
+      const dx = c - cx;
+      const dyRow = r - cy;
+      const dy = dyRow * ASPECT_Y;
+
+      // Almond eyelid — ellipse in (col, row) space. Anything outside is sky.
+      const lidNorm = Math.sqrt((dx / lidW) ** 2 + (dyRow / lidH) ** 2);
+      if (lidNorm > 1) { out += ' '; continue; }
+
+      // Pupil/iris distance in cell-aspect-corrected space.
+      const pdx = dx - offX;
+      const pdy = dy - offY * ASPECT_Y;
+      const distPupil = Math.sqrt(pdx * pdx + pdy * pdy);
+      const distIrisN = distPupil / irisR;
+
+      const nearEdge = lidNorm > 0.9;
+
+      if (distPupil < PUPIL_R) {
+        out += '@';
+      } else if (distIrisN < 1) {
+        out += distIrisN < 0.55 ? 'O' : 'o';
+      } else if (nearEdge) {
+        // Curve the eyelid with under/overscored chars depending on side.
+        if (dyRow < -0.4) out += '_';
+        else if (dyRow > 0.4) out += '_';
+        else out += '.';
+      } else {
+        out += '.';
+      }
+    }
+    out += '\n';
+  }
+  return out.replace(/\n$/, '');
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
 export function createDilenciPanel(container: HTMLElement): DilenciPanelAPI {
   const el = document.createElement('div');
   el.className = 'dilenci-panel';
@@ -43,15 +107,9 @@ export function createDilenciPanel(container: HTMLElement): DilenciPanelAPI {
   const prefixEl = document.createElement('span');
   prefixEl.className = 'dilenci-panel__prefix';
 
-  const faceEl = document.createElement('div');
-  faceEl.className = 'dilenci-panel__face';
-  const leftEye = document.createElement('span');
-  leftEye.className = 'dilenci-panel__eye';
-  leftEye.textContent = EYE_DEFAULT;
-  const rightEye = document.createElement('span');
-  rightEye.className = 'dilenci-panel__eye';
-  rightEye.textContent = EYE_DEFAULT;
-  faceEl.append(leftEye, rightEye);
+  const eyeEl = document.createElement('pre');
+  eyeEl.className = 'dilenci-panel__eye-art';
+  eyeEl.setAttribute('aria-hidden', 'true');
 
   const lineEl = document.createElement('span');
   lineEl.className = 'dilenci-panel__line';
@@ -59,70 +117,106 @@ export function createDilenciPanel(container: HTMLElement): DilenciPanelAPI {
   const hintEl = document.createElement('span');
   hintEl.className = 'dilenci-panel__hint';
 
-  el.append(prefixEl, faceEl, lineEl, hintEl);
+  const thinkingEl = document.createElement('span');
+  thinkingEl.className = 'dilenci-panel__thinking';
+  thinkingEl.textContent = '...';
+
+  el.append(prefixEl, eyeEl, thinkingEl, lineEl, hintEl);
   container.appendChild(el);
 
+  const eyeState: EyeState = { lookX: 0, lookY: 0, blink: 0, dilation: 1 };
   let open = false;
   let expression: DilenciExpression = 'default';
   let blinkTimer: number | null = null;
-  let driftTimer: number | null = null;
+  let thinkingTicker: number | null = null;
+  let mouseHandler: ((e: MouseEvent) => void) | null = null;
+  let rafQueued = false;
 
-  function glyphFor(state: DilenciExpression): string {
-    switch (state) {
-      case 'alert':   return EYE_ALERT;
-      case 'happy':   return EYE_HAPPY;
-      case 'sad':     return EYE_SAD;
-      default:        return EYE_DEFAULT;
+  function paint(): void {
+    rafQueued = false;
+    eyeEl.textContent = renderEye(eyeState);
+  }
+
+  function schedulePaint(): void {
+    if (rafQueued) return;
+    rafQueued = true;
+    requestAnimationFrame(paint);
+  }
+
+  function attachCursorTracking(): void {
+    if (mouseHandler) return;
+    mouseHandler = (e: MouseEvent) => {
+      // Where is the eye, right now? Use the actual pre-element rect so the
+      // pupil tracks correctly even after the panel re-flows.
+      const rect = eyeEl.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = e.clientX - cx;
+      const dy = e.clientY - cy;
+      // Normalize over a generous radius so motion is responsive but bounded.
+      const norm = 320;
+      eyeState.lookX = clamp(dx / norm, -1, 1);
+      eyeState.lookY = clamp(dy / norm, -1, 1);
+      schedulePaint();
+    };
+    document.addEventListener('mousemove', mouseHandler, { passive: true });
+  }
+
+  function detachCursorTracking(): void {
+    if (mouseHandler) {
+      document.removeEventListener('mousemove', mouseHandler);
+      mouseHandler = null;
     }
   }
 
-  function setEyeGlyph(g: string): void {
-    leftEye.textContent = g;
-    rightEye.textContent = g;
-  }
-
   function blinkOnce(): void {
-    leftEye.classList.add('is-blink');
-    rightEye.classList.add('is-blink');
-    window.setTimeout(() => {
-      leftEye.classList.remove('is-blink');
-      rightEye.classList.remove('is-blink');
-    }, 130);
+    // Frame timing: 0 → 0.4 → 0.8 → 1.0 → 1.0 → 0.6 → 0.2 → 0.
+    const frames = [0.4, 0.8, 1.0, 1.0, 0.6, 0.2, 0];
+    let i = 0;
+    const id = window.setInterval(() => {
+      eyeState.blink = frames[i++];
+      schedulePaint();
+      if (i >= frames.length) clearInterval(id);
+    }, 32);
   }
 
   function scheduleBlink(): void {
     if (blinkTimer != null) clearTimeout(blinkTimer);
+    const wait = expression === 'thinking'
+      ? 700 + Math.random() * 900           // fast, restless
+      : 3_400 + Math.random() * 4_600;      // calm, natural
     blinkTimer = window.setTimeout(() => {
       if (open) blinkOnce();
       scheduleBlink();
-    }, 3_500 + Math.random() * 4_500);
+    }, wait);
   }
 
-  function scheduleDrift(): void {
-    if (driftTimer != null) clearTimeout(driftTimer);
-    driftTimer = window.setTimeout(() => {
-      if (open && expression === 'default') {
-        // Briefly show a fragment-letter in one eye, like a passing thought.
-        const which = Math.random() < 0.5 ? leftEye : rightEye;
-        const letter = DRIFT_LETTERS[Math.floor(Math.random() * DRIFT_LETTERS.length)];
-        const original = which.textContent;
-        which.textContent = letter;
-        faceEl.classList.add('is-drift');
-        window.setTimeout(() => {
-          which.textContent = original;
-          faceEl.classList.remove('is-drift');
-        }, 700);
-      }
-      scheduleDrift();
-    }, 8_000 + Math.random() * 9_000);
+  function stopThinkingTicker(): void {
+    if (thinkingTicker != null) { clearInterval(thinkingTicker); thinkingTicker = null; }
   }
 
   function applyExpression(): void {
-    faceEl.classList.remove('is-alert', 'is-happy', 'is-sad');
-    if (expression === 'alert') faceEl.classList.add('is-alert');
-    else if (expression === 'happy') faceEl.classList.add('is-happy');
-    else if (expression === 'sad') faceEl.classList.add('is-sad');
-    setEyeGlyph(glyphFor(expression));
+    el.classList.remove('dilenci-panel--alert', 'dilenci-panel--happy', 'dilenci-panel--sad', 'dilenci-panel--thinking');
+    if (expression !== 'default') el.classList.add(`dilenci-panel--${expression}`);
+    switch (expression) {
+      case 'alert':    eyeState.dilation = 1.2; eyeState.blink = 0; break;
+      case 'happy':    eyeState.dilation = 0.8; eyeState.blink = 0.6; break;
+      case 'sad':      eyeState.dilation = 0.9; eyeState.blink = 0.4; eyeState.lookY = 0.6; break;
+      case 'thinking': eyeState.dilation = 1.0; eyeState.blink = 0; break;
+      default:         eyeState.dilation = 1.0; eyeState.blink = 0; break;
+    }
+    schedulePaint();
+    stopThinkingTicker();
+    if (expression === 'thinking') {
+      const ticker = ['.  ', '.. ', '...', ' ..', '  .'];
+      let idx = 0;
+      thinkingEl.textContent = ticker[0];
+      thinkingTicker = window.setInterval(() => {
+        idx = (idx + 1) % ticker.length;
+        thinkingEl.textContent = ticker[idx];
+      }, 220);
+    }
   }
 
   function pickPrefix(): string {
@@ -135,11 +229,12 @@ export function createDilenciPanel(container: HTMLElement): DilenciPanelAPI {
       lineEl.textContent = line;
       hintEl.textContent = hint ?? '';
       expression = 'default';
+      eyeState.lookX = 0; eyeState.lookY = 0; eyeState.blink = 0; eyeState.dilation = 1;
       applyExpression();
       requestAnimationFrame(() => el.classList.add('is-open'));
       open = true;
+      attachCursorTracking();
       scheduleBlink();
-      scheduleDrift();
     },
     setLine(line, hint) {
       lineEl.textContent = line;
@@ -152,8 +247,9 @@ export function createDilenciPanel(container: HTMLElement): DilenciPanelAPI {
     close() {
       el.classList.remove('is-open');
       open = false;
+      detachCursorTracking();
       if (blinkTimer != null) { clearTimeout(blinkTimer); blinkTimer = null; }
-      if (driftTimer != null) { clearTimeout(driftTimer); driftTimer = null; }
+      stopThinkingTicker();
     },
     isOpen() { return open; },
     destroy() {

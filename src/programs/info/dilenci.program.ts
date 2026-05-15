@@ -7,7 +7,7 @@ import type { Program, ProgramContext } from '../../kernel/program';
 interface DilenciAPI {
   wake(): void;
   silence(toggle: boolean): void;
-  status(): { hunger: number; tone: string; silenced: boolean };
+  status(): { hunger: number; tone: string; silenced: boolean; llm: 'ready' | 'pending' };
   isInOfferMode(): boolean;
   feedFromOfferLine(line: string): void;
 }
@@ -28,7 +28,7 @@ function toneLabel(tone: string): string {
 
 const prog: Program = {
   name: 'dilenci',
-  manpage: 'dilenci — the abandoned alter-ego.\n  dilenci          show his current tone\n  dilenci wake     stir him now\n  dilenci silence  hide him\n  dilenci unsilence  let him return\n  dilenci feed <line>  offer him a line directly',
+  manpage: 'dilenci — the abandoned alter-ego.\n  dilenci          show his current tone\n  dilenci wake     wake him; the prompt becomes `tell him: `\n  dilenci silence  hide him\n  dilenci unsilence  let him return\n  dilenci feed <line>  offer him a line directly\n\nin a conversation: type a line and press enter. `bye` or esc to leave.\nhe does not leave on his own.',
   category: 'util',
   mode: 'inline',
   onCommand: (ctx: ProgramContext, argv: string[]) => {
@@ -40,12 +40,13 @@ const prog: Program = {
       const s = d.status();
       ctx.println(toneLabel(s.tone));
       if (s.silenced) ctx.println('he is silenced.');
+      if (s.llm === 'pending') ctx.println('(he is still loading. seeds for now.)');
       return;
     }
 
     if (sub === 'wake') {
       d.wake();
-      ctx.println('he stirred.');
+      ctx.println('he is listening.');
     } else if (sub === 'silence') {
       d.silence(true);
       ctx.println('the room is quiet.');
