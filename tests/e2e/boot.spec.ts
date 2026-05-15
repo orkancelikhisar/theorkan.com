@@ -55,6 +55,30 @@ test('life launches and quits cleanly', async ({ page }) => {
   await expect(page.locator('.life-overlay')).toBeHidden({ timeout: 2_000 });
 });
 
+test('whois returns lore for a known name', async ({ page }) => {
+  await page.goto('/');
+  await waitForBootReady(page);
+  await page.keyboard.press('Enter');
+  await waitForReadyTerminal(page);
+  await page.locator('.terminal__input').focus();
+  await page.keyboard.type('whois stowaway');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.terminal')).toContainText('the one that boarded with you', { timeout: 5_000 });
+});
+
+test('pinpoint prints a signature and uniqueness estimate', async ({ page }) => {
+  await page.goto('/');
+  await waitForBootReady(page);
+  await page.keyboard.press('Enter');
+  await waitForReadyTerminal(page);
+  await page.locator('.terminal__input').focus();
+  await page.keyboard.type('pinpoint');
+  await page.keyboard.press('Enter');
+  // The scan is async (progressive checkmarks then summary). Give it room.
+  await expect(page.locator('.terminal')).toContainText('your signature', { timeout: 8_000 });
+  await expect(page.locator('.terminal')).toContainText('you are 1 in', { timeout: 8_000 });
+});
+
 test('regatta launches and quits cleanly', async ({ page }) => {
   await page.goto('/');
   await waitForBootReady(page);
