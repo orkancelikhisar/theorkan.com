@@ -9,6 +9,7 @@ const IDLE_MS = 90_000;
 
 interface CameraSession {
   panelId: string;
+  panel: PanelManager;
   stream: MediaStream;
   video: HTMLVideoElement;
   canvas: HTMLCanvasElement;
@@ -94,7 +95,7 @@ export async function requestEyesCamera(panel: PanelManager): Promise<'granted' 
 
   const idleTimer = window.setInterval(checkIdle, 5000);
 
-  active = { panelId, stream, video, canvas, rafId: 0, idleTimer };
+  active = { panelId, panel, stream, video, canvas, rafId: 0, idleTimer };
   active.rafId = requestAnimationFrame(frame);
 
   return 'granted';
@@ -102,11 +103,15 @@ export async function requestEyesCamera(panel: PanelManager): Promise<'granted' 
 
 export function stopActive(): void {
   if (!active) return;
-  cancelAnimationFrame(active.rafId);
-  window.clearInterval(active.idleTimer);
-  active.stream.getTracks().forEach((t) => t.stop());
-  active.video.srcObject = null;
+  // Snapshot before clearing so the panel.close() onClose callback (which
+  // will re-enter stopActive) becomes a no-op when active is null.
+  const session = active;
   active = null;
+  cancelAnimationFrame(session.rafId);
+  window.clearInterval(session.idleTimer);
+  session.stream.getTracks().forEach((t) => t.stop());
+  session.video.srcObject = null;
+  session.panel.close(session.panelId);
 }
 
 export function isEyesActive(): boolean { return active !== null; }

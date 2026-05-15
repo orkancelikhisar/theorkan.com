@@ -44,7 +44,12 @@ export function createShell(
   termClear: () => void,
   historyAll: () => string[],
 ): ShellAPI {
-  const state: ShellState = { cwd: '/home/orkan', aliases: {}, vibeLevel: audio.getVibe() };
+  const state: ShellState = {
+    cwd: '/home/orkan',
+    previousCwd: '/home/orkan',
+    aliases: {},
+    vibeLevel: audio.getVibe(),
+  };
   let discovered = new Set<string>();
   let modalProg: Program | null = null;
   try { discovered = new Set(JSON.parse(localStorage.getItem(DISCOVERED_KEY) || '[]')); } catch { /* */ }

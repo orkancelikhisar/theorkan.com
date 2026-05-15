@@ -38,11 +38,28 @@ export function createPanelManager(container: HTMLElement): PanelManager {
     if (opts.width)  el.style.width  = `${opts.width}px`;
     if (opts.height) el.style.height = `${opts.height}px`;
 
-    if (opts.title) {
-      const titleEl = document.createElement('div');
-      titleEl.className = 'panel__title';
-      titleEl.textContent = opts.title;
-      el.appendChild(titleEl);
+    const closable = opts.closable !== false;
+    if (opts.title || closable) {
+      const titleBar = document.createElement('div');
+      titleBar.className = 'panel__title';
+
+      const titleText = document.createElement('span');
+      titleText.className = 'panel__title-text';
+      titleText.textContent = opts.title ?? '';
+      titleBar.appendChild(titleText);
+
+      if (closable) {
+        const xBtn = document.createElement('button');
+        xBtn.className = 'panel__close';
+        xBtn.setAttribute('aria-label', 'close');
+        xBtn.textContent = '×';
+        xBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          close(id);
+        });
+        titleBar.appendChild(xBtn);
+      }
+      el.appendChild(titleBar);
     }
 
     const contentEl = document.createElement('div');

@@ -6,16 +6,22 @@ export interface Buoy {
 }
 
 export interface RegattaState {
-  // boat
-  position: Vec2;
-  velocity: Vec2;
-  heading: number;
-  speedKt: number;
-  rudderDeg: number;
-  sailAngleDeg: number;
-  heel: number;
+  // Boat
+  position: Vec2;            // world frame, meters
+  velocity: Vec2;            // world frame, m/s
+  heading: number;           // degrees
+  rudderDeg: number;         // -35..35
 
-  // wind
+  // Sail (force-based)
+  sailAngleDeg: number;      // current sail angle, signed (-90..+90, 0 = centerline aft)
+  sailVelDeg: number;        // sail angular velocity, deg/s
+  sailMaxDeg: number;        // mainsheet limit (player-controlled, 5..90)
+
+  // Cosmetic
+  heel: number;              // degrees, signed (visual)
+  luffing: boolean;
+
+  // Wind
   trueWindDeg: number;
   trueWindKt: number;
   windTargetDeg: number;
@@ -23,24 +29,21 @@ export interface RegattaState {
   nextShiftAt: number;
   gustUntil: number;
 
-  // race
+  // Race
   buoys: Buoy[];
   nextBuoy: number;
   startMs: number;
   elapsedMs: number;
   finished: boolean;
 
-  // input intents
+  // Input intents (set on keydown, cleared on keyup)
   rudderIntent: -1 | 0 | 1;
-  sailIntent: -1 | 0 | 1;
+  sheetIntent: -1 | 0 | 1;   // +1 = haul in (decrease max), -1 = ease out (increase max)
 
-  // tutorial / coach
+  // Tutorial / coach
   showTutorial: boolean;
   coach: string | null;
   coachUntil: number;
-
-  // luff state for rendering
-  luffing: boolean;
 }
 
 export function initialState(now: number): RegattaState {
@@ -49,10 +52,14 @@ export function initialState(now: number): RegattaState {
     position: { x: 0, y: 0 },
     velocity: { x: 0, y: 0 },
     heading: 0,
-    speedKt: 0,
     rudderDeg: 0,
-    sailAngleDeg: 45,
+
+    sailAngleDeg: 0,
+    sailVelDeg: 0,
+    sailMaxDeg: 60,
+
     heel: 0,
+    luffing: false,
 
     trueWindDeg: startDeg,
     trueWindKt: 6,
@@ -72,12 +79,10 @@ export function initialState(now: number): RegattaState {
     finished: false,
 
     rudderIntent: 0,
-    sailIntent: 0,
+    sheetIntent: 0,
 
     showTutorial: true,
     coach: null,
     coachUntil: 0,
-
-    luffing: false,
   };
 }

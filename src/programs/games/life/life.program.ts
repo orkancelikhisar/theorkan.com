@@ -41,8 +41,8 @@ function draw(): void {
   const border = '─'.repeat(W);
   state.boardEl.textContent = `┌${border}┐\n${rows.map((row) => `│${row}│`).join('\n')}\n└${border}┘`;
   state.statusEl.textContent = state.playing
-    ? `playing. generation ${state.generation}. space pause. r random. c clear. q quit.`
-    : `paused. arrows move. space place/play. r random. c clear. g glider. q quit.`;
+    ? `playing. gen ${state.generation}. p pause. r random. c clear. q quit.`
+    : `paused. arrows move. space place. p play. r random. c clear. g glider. q quit.`;
 }
 
 function tick(): void {
@@ -94,7 +94,7 @@ const prog: Program = {
     if (key.key === 'q' || key.key === 'Escape') { close(); return; }
 
     if (state.playing) {
-      if (key.key === ' ' || key.key === 'Spacebar') {
+      if (key.key === 'p' || key.key === 'P') {
         state.playing = false;
         if (state.loop != null) window.clearInterval(state.loop);
         state.loop = null;
@@ -108,7 +108,10 @@ const prog: Program = {
     if (key.key === 'ArrowLeft')  state.cursor.x = (state.cursor.x - 1 + W) % W;
     if (key.key === 'ArrowRight') state.cursor.x = (state.cursor.x + 1) % W;
     if (key.key === ' ' || key.key === 'Spacebar') {
+      // toggle the cell under the cursor — does NOT start the simulation.
       state.board[state.cursor.y][state.cursor.x] = 1 - state.board[state.cursor.y][state.cursor.x];
+    }
+    if (key.key === 'p' || key.key === 'P') {
       const anyAlive = state.board.some((row) => row.some((v) => v));
       if (anyAlive) {
         state.playing = true;

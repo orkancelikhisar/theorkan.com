@@ -1,9 +1,12 @@
-import { deg2rad, signedAngleDeg, headingOf, apparentWind, vec } from './physics';
+import {
+  deg2rad, signedAngleDeg, headingOf, apparentWind, vec, magnitude,
+} from './physics';
 import type { RegattaState } from './state';
 
 const VIEW_W = 800;
 const VIEW_H = 480;
 const PX_PER_M = 2.2;
+const KT_TO_MS = 0.5144;
 
 interface Particle {
   x: number; y: number;
@@ -37,6 +40,8 @@ export class RegattaRenderer {
     const c = this.ctx;
     c.fillStyle = '#0a0a0a';
     c.fillRect(0, 0, VIEW_W, VIEW_H);
+
+    const speedKt = magnitude(state.velocity) / KT_TO_MS;
 
     // --- sea texture (scrolling) ---
     this.scrollOffsetMs += dtMs;
@@ -96,15 +101,15 @@ export class RegattaRenderer {
     this.particles = this.particles.filter((p) => p.age < p.life);
 
     // --- spawn wake (behind boat) ---
-    if (state.speedKt > 0.5) {
+    if (speedKt > 0.5) {
       const sternX = VIEW_W / 2 - Math.sin(deg2rad(state.heading)) * 6;
       const sternY = VIEW_H / 2 + Math.cos(deg2rad(state.heading)) * 6;
       this.particles.push({ x: sternX, y: sternY, vx: 0, vy: 0, age: 0, life: 2000, kind: 'wake' });
     }
 
     // --- spawn bow wave ---
-    if (state.speedKt > 1.5) {
-      const sp = Math.min(5, Math.floor(state.speedKt));
+    if (speedKt > 1.5) {
+      const sp = Math.min(5, Math.floor(speedKt));
       for (let i = 0; i < sp; i++) {
         const bowX = VIEW_W / 2 + Math.sin(deg2rad(state.heading)) * 6;
         const bowY = VIEW_H / 2 - Math.cos(deg2rad(state.heading)) * 6;
@@ -145,15 +150,17 @@ export class RegattaRenderer {
     c.closePath();
     c.stroke();
 
-    // boom: from centroid (0,1) at length 9, angle = (180 - sailAngleDeg) * leewardSign
-    const trueVec = vec(state.trueWindDeg, state.trueWindKt * 0.514);
-    const velVec = vec(state.heading, state.speedKt * 0.514);
-    const ap = apparentWind(trueVec, velVec);
-    const apSigned = signedAngleDeg(headingOf(ap) - state.heading);
-    const leewardSign = apSigned >= 0 ? 1 : -1;
-    const sailRad = deg2rad((180 - state.sailAngleDeg) * leewardSign);
-    const boomEndX = Math.sin(sailRad) * 9;
-    const boomEndY = -Math.cos(sailRad) * 9;
+    // boom: rotates around centroid (0, 1) of the triangle.
+    // sailAngleDeg is the actual boom angle (signed, -90..+90, 0 = centerline aft).
+    // chord direction (along boom from mast aft to clew):
+    //   chord = (sin(a), -cos(a))   in screen-local frame the boat draws in
+    // We want to draw boom from centroid by 9 px along the chord (boom extends aft+sideways from mast).
+    // In our local frame here, +y is "up" (= forward = bow) because we drew the bow at -y... wait
+    // we drew bow at -10 (y = -10) → -y is bow, +y is stern. So aft direction is +y here.
+    // chord direction in screen-local: (sin(a), cos(a)) — sin gives starboard component, cos gives aft.
+    const a = deg2rad(state.sailAngleDeg);
+    const boomEndX = Math.sin(a) * 9;
+    const boomEndY = Math.cos(a) * 9;
     c.beginPath();
     c.moveTo(0, 1);
     if (state.luffing) {
@@ -163,14 +170,31 @@ export class RegattaRenderer {
       c.lineTo(boomEndX, boomEndY);
     }
     c.stroke();
+
+    // --- mainsheet limit indicator: two faint marks where sail will hit the rope ---
+    c.globalAlpha = 0.35;
+    const aMax = deg2rad(state.sailMaxDeg);
+    const limitR = 12;
+    for (const sign of [-1, 1]) {
+      const lx = Math.sin(aMax * sign) * limitR;
+      const ly = Math.cos(aMax * sign) * limitR;
+      c.beginPath();
+      c.moveTo(lx, ly);
+      c.lineTo(lx * 1.1, ly * 1.1);
+      c.stroke();
+    }
+    c.globalAlpha = 1;
     c.restore();
 
     // --- HUD ---
     c.fillStyle = '#e8e6df';
     c.font = '12px monospace';
     c.textAlign = 'left'; c.textBaseline = 'top';
+    const trueVec = vec(state.trueWindDeg, state.trueWindKt * KT_TO_MS);
+    const ap = apparentWind(trueVec, state.velocity);
+    const apSigned = signedAngleDeg(headingOf(ap) - state.heading);
     const apAbs = Math.abs(apSigned);
-    const sailLabel = state.luffing ? 'LUFF' : 'TRIMMED';
+    const sailLabel = state.luffing ? 'LUFF' : 'POWERED';
     const pointName =
       apAbs < 30 ? 'in irons' :
       apAbs < 50 ? 'close hauled' :
@@ -180,7 +204,7 @@ export class RegattaRenderer {
     const lines = [
       `WIND ${formatDeg(state.trueWindDeg)} ${state.trueWindKt.toFixed(1)}kt   APPARENT ${formatDeg(((headingOf(ap) % 360) + 360) % 360)}   ${pointName}`,
       ``,
-      `HDG ${formatDeg(state.heading)}   SPD ${state.speedKt.toFixed(1)}kt   SAIL ${Math.round(state.sailAngleDeg)}° ${sailLabel}   ELAPSED ${formatTime(state.elapsedMs)}`,
+      `HDG ${formatDeg(state.heading)}   SPD ${speedKt.toFixed(1)}kt   SAIL ${Math.round(state.sailAngleDeg)}°  SHEET max ${Math.round(state.sailMaxDeg)}° (${sailLabel})   ELAPSED ${formatTime(state.elapsedMs)}`,
     ];
     if (state.coach) lines.push('', `  ${state.coach}`);
     if (state.finished) {

@@ -18,19 +18,20 @@
 .terminal__line--dim { color: var(--bone-dim); }
 .terminal__line--warn { color: var(--bone); opacity: 0.8; }
 
-.terminal__prompt-line { display: flex; align-items: baseline; }
-.terminal__prompt { display: inline-block; color: var(--bone); white-space: pre; }
+.terminal__prompt-line {
+  display: block;
+  white-space: pre;
+}
+.terminal__prompt { display: inline; color: var(--bone); }
 .terminal__input {
-  display: inline-block;
+  display: inline;
   outline: none;
   caret-color: transparent;
-  flex: 1;
-  min-width: 1px;
   white-space: pre;
 }
 .terminal__cursor {
   display: inline-block;
-  width: 0.6em; height: 1em;
+  width: 0.55em; height: 1em;
   background: var(--bone); color: var(--void);
   vertical-align: text-bottom;
   animation: blink 1s steps(2, end) infinite;

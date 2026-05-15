@@ -137,6 +137,17 @@ async function main(): Promise<void> {
     });
   });
 
+  // Prompt cwd display
+  function shortenCwd(p: string): string {
+    if (p === '/home/orkan') return '~';
+    if (p.startsWith('/home/orkan/')) return '~' + p.slice('/home/orkan'.length);
+    return p;
+  }
+  function refreshPrompt(): void {
+    terminal.setPrompt(`orkan@theorkan:${shortenCwd(shell.state.cwd)}$ `);
+  }
+  refreshPrompt();
+
   // Submit handler
   terminal.onSubmit(async (line) => {
     history.add(line);
@@ -151,6 +162,7 @@ async function main(): Promise<void> {
     }
 
     await shell.run(line);
+    refreshPrompt();
     events.emit('shell:active', null);
   });
 

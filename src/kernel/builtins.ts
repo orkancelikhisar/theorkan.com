@@ -5,6 +5,7 @@ import type { FSNode } from './fs-types';
 
 export interface ShellState {
   cwd: string;
+  previousCwd: string;
   aliases: Record<string, string>;
   vibeLevel: 'off' | 'low' | 'medium' | 'high';
 }
@@ -56,12 +57,18 @@ export function createBuiltins(
   }
 
   return {
-    cd: (argv) => {
-      const target = argv[1] || '~';
+    cd: (argv, _s, _fs, out) => {
+      let target = argv[1] || '~';
+      // `cd -` (and `cd --`) jumps to the previous directory, bash-style.
+      if (target === '-' || target === '--') {
+        if (!state.previousCwd) { out('cd: OLDPWD not set'); return; }
+        target = state.previousCwd;
+      }
       const resolved = fs.resolve(target, state.cwd);
-      if (!fs.exists(resolved)) return;
+      if (!fs.exists(resolved)) { out(`cd: ${argv[1]}: no such file or directory`); return; }
       const node = fs.getNode(resolved);
-      if (!node || node.type !== 'dir') return;
+      if (!node || node.type !== 'dir') { out(`cd: ${argv[1]}: not a directory`); return; }
+      state.previousCwd = state.cwd;
       return { newCwd: resolved };
     },
     pwd: (_argv, _s, _fs, out) => out(state.cwd),

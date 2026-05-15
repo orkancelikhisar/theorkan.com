@@ -1,23 +1,27 @@
 import {
-  apparentWind, vec, magnitude, headingOf,
-  signedAngleDeg, targetSpeed, nextSpeed,
-  rudderTurnRate, leewayKnots, heelDeg, trimEfficiency,
+  vec, magnitude, headingOf,
+  signedAngleDeg, apparentWind,
+  toBoatFrame, toWorldFrame,
+  rudderTurnRate, heelDegFromForce,
+  stepSail,
+  HULL_DRAG,
 } from './physics';
 import type { RegattaState } from './state';
 
 const RUDDER_MAX = 35;
 const RUDDER_RATE_PER_S = 90;
 const RUDDER_CENTER_PER_S = 60;
-const SAIL_RATE_PER_S = 60;
-const SAIL_MIN = 0;
-const SAIL_MAX = 90;
+const SHEET_RATE_PER_S = 50;        // deg/s applied to sailMaxDeg
+const SHEET_MIN = 5;
+const SHEET_MAX = 90;
+const KT_TO_MS = 0.5144;
 
 export function updateRegatta(state: RegattaState, now: number, dtMs: number): void {
   if (state.finished) return;
   const dt = dtMs / 1000;
   state.elapsedMs = now - state.startMs;
 
-  // --- wind dynamics ---
+  // --- wind dynamics (shifts + gusts) ---
   if (now >= state.nextShiftAt) {
     state.windTargetDeg += (Math.random() - 0.5) * 30;
     state.windTargetKt = 3 + Math.random() * 6;
@@ -32,6 +36,7 @@ export function updateRegatta(state: RegattaState, now: number, dtMs: number): v
   const windKt = state.trueWindKt * gustMul;
 
   // --- input → controls ---
+  // Rudder: hold to turn, self-center on release.
   if (state.rudderIntent !== 0) {
     state.rudderDeg += state.rudderIntent * RUDDER_RATE_PER_S * dt;
   } else {
@@ -41,50 +46,60 @@ export function updateRegatta(state: RegattaState, now: number, dtMs: number): v
   }
   state.rudderDeg = Math.max(-RUDDER_MAX, Math.min(RUDDER_MAX, state.rudderDeg));
 
-  // up arrow = +1 (haul in, smaller angle). down = -1 (ease out).
-  if (state.sailIntent !== 0) {
-    state.sailAngleDeg -= state.sailIntent * SAIL_RATE_PER_S * dt;
-    state.sailAngleDeg = Math.max(SAIL_MIN, Math.min(SAIL_MAX, state.sailAngleDeg));
+  // Mainsheet: ↑ hauls in (decreases max angle), ↓ eases out (increases).
+  if (state.sheetIntent !== 0) {
+    state.sailMaxDeg -= state.sheetIntent * SHEET_RATE_PER_S * dt;
+    state.sailMaxDeg = Math.max(SHEET_MIN, Math.min(SHEET_MAX, state.sailMaxDeg));
   }
 
-  // --- velocity (m/s, 1 kt ≈ 0.514 m/s) ---
-  const speedMs = state.speedKt * 0.514;
-  state.velocity = vec(state.heading, speedMs);
+  // --- apparent wind in boat frame ---
+  const trueWindVec = vec(state.trueWindDeg, windKt * KT_TO_MS);
+  const apparentWorld = apparentWind(trueWindVec, state.velocity);
+  const apparentBoat = toBoatFrame(apparentWorld, state.heading);
 
-  // --- apparent wind ---
-  const trueWindVec = vec(state.trueWindDeg, windKt * 0.514);
-  const apparent = apparentWind(trueWindVec, state.velocity);
-  const apMag = magnitude(apparent) / 0.514;
-  const apHeading = headingOf(apparent);
-  const apAngleSigned = signedAngleDeg(apHeading - state.heading);
-  const apAngleAbs = Math.abs(apAngleSigned);
+  // --- sail step + force ---
+  const sailStep = stepSail(
+    state.sailAngleDeg,
+    state.sailVelDeg,
+    state.sailMaxDeg,
+    apparentBoat,
+    dtMs,
+  );
+  state.sailAngleDeg = sailStep.sailAngleDeg;
+  state.sailVelDeg = sailStep.sailVelDeg;
+  state.luffing = sailStep.luffing;
 
-  // --- target + new speed ---
-  const target = targetSpeed(apMag, apAngleAbs, state.sailAngleDeg);
-  state.speedKt = nextSpeed(state.speedKt, target, dtMs);
-
-  // luff state for rendering
-  const trim = trimEfficiency(0, apAngleAbs, state.sailAngleDeg);
-  state.luffing = trim <= 0.25 || apAngleAbs < 30;
+  // --- apply force to velocity (with drag) ---
+  const forceWorld = toWorldFrame(sailStep.forceBoatFrame, state.heading);
+  state.velocity.x += forceWorld.x * dt;
+  state.velocity.y += forceWorld.y * dt;
+  // Linear hull drag.
+  const decay = Math.exp(-HULL_DRAG * dt);
+  state.velocity.x *= decay;
+  state.velocity.y *= decay;
 
   // --- heading: rudder turns boat (needs flow) ---
-  state.heading += rudderTurnRate(state.rudderDeg, state.speedKt) * dt;
+  const speedMs = magnitude(state.velocity);
+  const speedKt = speedMs / KT_TO_MS;
+  state.heading += rudderTurnRate(state.rudderDeg, speedKt) * dt;
   state.heading = ((state.heading % 360) + 360) % 360;
 
-  // --- position: speed along heading + leeway perpendicular ---
-  const headingVec = vec(state.heading, speedMs);
-  const leeMs = leewayKnots(apAngleAbs, apMag) * 0.514;
-  const leeSign = apAngleSigned >= 0 ? 1 : -1;
-  const perp = vec(state.heading + 90 * leeSign, leeMs);
-  state.position.x += (headingVec.x + perp.x) * dt;
-  state.position.y += (headingVec.y + perp.y) * dt;
+  // --- position ---
+  state.position.x += state.velocity.x * dt;
+  state.position.y += state.velocity.y * dt;
 
   // --- heel (cosmetic) ---
-  state.heel = heelDeg(apAngleSigned, apMag, trim);
+  state.heel = heelDegFromForce(sailStep.forceBoatFrame.x);
 
   // --- coach prompts ---
-  if (!state.coach && apAngleAbs < 30 && state.elapsedMs > 5_000) {
-    state.coach = 'bear off — pull the rudder, ease the sail.';
+  const apparentAbs = magnitude(apparentBoat) > 0.5
+    ? Math.abs(signedAngleDeg(headingOf(apparentBoat)))
+    : 0;
+  if (!state.coach && state.luffing && state.elapsedMs > 5_000) {
+    state.coach = 'sail is luffing. trim in (↑) or bear off.';
+    state.coachUntil = now + 5_000;
+  } else if (!state.coach && apparentAbs < 30 && state.elapsedMs > 5_000 && speedKt < 0.3) {
+    state.coach = 'in irons. bear off — pull the rudder.';
     state.coachUntil = now + 5_000;
   } else if (state.coach && now > state.coachUntil) {
     state.coach = null;
