@@ -68,10 +68,12 @@ export function initialState(now: number): RegattaState {
     nextShiftAt: now + 25_000,
     gustUntil: 0,
 
+    // Course shrunk so the whole thing fits inside the canvas at PX_PER_M=4
+    // (canvas covers roughly ±100 m horizontal × ±60 m vertical from origin).
     buoys: [
-      { pos: { x: 0,    y: 250 }, rounded: false },
-      { pos: { x: -120, y: -150 }, rounded: false },
-      { pos: { x: 0,    y: 0   }, rounded: false },
+      { pos: { x: 0,   y: 50 },  rounded: false },   // windward
+      { pos: { x: -35, y: -30 }, rounded: false },   // leeward
+      { pos: { x: 0,   y: 0 },   rounded: false },   // start / finish
     ],
     nextBuoy: 0,
     startMs: now,
