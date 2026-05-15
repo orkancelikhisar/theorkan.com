@@ -86,8 +86,10 @@ export function buildBootScript(): BootLine[] {
   lines.push({ kind: 'motd', text: '      try `hints` if you are lost.' });
   lines.push({ kind: 'plain', text: '' });
 
+  // Always invite the visitor to press enter; the wording differs for
+  // returning visitors so the boot still feels personal.
   if (lastSeen) {
-    lines.push({ kind: 'prompt', text: 'orkan@theorkan:~$ ' });
+    lines.push({ kind: 'prompt', text: '> press enter to continue_' });
   } else {
     lines.push({ kind: 'prompt', text: '> press enter to wake up_' });
   }

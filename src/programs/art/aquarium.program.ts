@@ -2,12 +2,14 @@ import './aquarium.css';
 import type { Program } from '../../kernel/program';
 import { SCENES, DEFAULT_SCENE, type Scene, type SceneContext } from './aquarium-scenes';
 
-const WIDTH = 480;
-const HEIGHT = 200;
+const WIDTH = 300;
+const HEIGHT = 130;
 
 interface Active {
   panelId: string;
   canvas: HTMLCanvasElement;
+  wrapper: HTMLElement;
+  buttons: Map<string, HTMLButtonElement>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   scene: Scene<any>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,50 +35,47 @@ function close(): void {
   active = null;
 }
 
-function openScene(
-  panelSpawn: (opts: { title: string; contentEl: HTMLElement; position: 'bottom-left'; width: number; height: number; onClose: () => void }) => string,
-  panelClose: (id: string) => void,
-  panelFocus: (id: string) => void,
-  sceneKey: string,
-): { result: string; ok: boolean } {
-  const scene = SCENES[sceneKey];
-  if (!scene) {
-    const list = Object.keys(SCENES).join(', ');
-    return { result: `aquarium: unknown scene "${sceneKey}". try: ${list}`, ok: false };
+function switchScene(key: string): void {
+  if (!active) return;
+  const next = SCENES[key];
+  if (!next) return;
+  active.scene = next;
+  active.sceneState = next.init(active.sceneCtx);
+  for (const [k, btn] of active.buttons) {
+    btn.classList.toggle('aquarium-btn--active', k === key);
   }
-  if (active) {
-    // Switch scene without re-opening the panel
-    active.scene = scene;
-    active.sceneState = scene.init(active.sceneCtx);
-    panelFocus(active.panelId);
-    return { result: `aquarium: switched to ${scene.name} — ${scene.description}.`, ok: true };
+}
+
+function buildWrapper(initialScene: string): {
+  wrapper: HTMLElement; canvas: HTMLCanvasElement; buttons: Map<string, HTMLButtonElement>;
+} {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'aquarium-wrapper';
+
+  const controls = document.createElement('div');
+  controls.className = 'aquarium-controls';
+  const buttons = new Map<string, HTMLButtonElement>();
+  for (const [key, scene] of Object.entries(SCENES)) {
+    const btn = document.createElement('button');
+    btn.className = 'aquarium-btn' + (key === initialScene ? ' aquarium-btn--active' : '');
+    btn.textContent = scene.name;
+    btn.title = scene.description;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      switchScene(key);
+    });
+    buttons.set(key, btn);
+    controls.appendChild(btn);
   }
+  wrapper.appendChild(controls);
+
   const canvas = document.createElement('canvas');
   canvas.className = 'aquarium-canvas';
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
-  const cctx = canvas.getContext('2d');
-  if (!cctx) return { result: 'aquarium: canvas not supported.', ok: false };
+  wrapper.appendChild(canvas);
 
-  const sceneCtx: SceneContext = { ctx: cctx, width: WIDTH, height: HEIGHT };
-  const sceneState = scene.init(sceneCtx);
-
-  const panelId = panelSpawn({
-    title: `aquarium — ${scene.name}`,
-    contentEl: canvas,
-    position: 'bottom-left',
-    width: WIDTH + 22,
-    height: HEIGHT + 56,
-    onClose: () => { close(); },
-  });
-
-  active = {
-    panelId, canvas, scene, sceneState, sceneCtx,
-    rafId: 0, lastFrameMs: performance.now(),
-  };
-  active.rafId = requestAnimationFrame(tick);
-  void panelClose;  // not used here
-  return { result: `aquarium: opened ${scene.name} — ${scene.description}. \`aquarium off\` to close.`, ok: true };
+  return { wrapper, canvas, buttons };
 }
 
 const prog: Program = {
@@ -104,14 +103,42 @@ const prog: Program = {
     }
 
     const sceneKey = sub ?? DEFAULT_SCENE;
-    const { result } = openScene(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (opts) => ctx.panel.spawn(opts as any),
-      (id) => ctx.panel.close(id),
-      (id) => ctx.panel.focus(id),
-      sceneKey,
-    );
-    return result;
+    const scene = SCENES[sceneKey];
+    if (!scene) {
+      const list = Object.keys(SCENES).join(', ');
+      return `aquarium: unknown scene "${sceneKey}". try: ${list}`;
+    }
+
+    if (active) {
+      switchScene(sceneKey);
+      ctx.panel.focus(active.panelId);
+      return `aquarium: switched to ${scene.name}.`;
+    }
+
+    const { wrapper, canvas, buttons } = buildWrapper(sceneKey);
+    const cctx = canvas.getContext('2d');
+    if (!cctx) return 'aquarium: canvas not supported.';
+
+    const sceneCtx: SceneContext = { ctx: cctx, width: WIDTH, height: HEIGHT };
+    const sceneState = scene.init(sceneCtx);
+
+    const panelId = ctx.panel.spawn({
+      title: 'aquarium',
+      contentEl: wrapper,
+      position: 'top-right',
+      width: WIDTH + 22,
+      height: HEIGHT + 80,
+      onClose: () => { close(); },
+    });
+
+    active = {
+      panelId, canvas, wrapper, buttons,
+      scene, sceneState, sceneCtx,
+      rafId: 0, lastFrameMs: performance.now(),
+    };
+    active.rafId = requestAnimationFrame(tick);
+
+    return `aquarium: opened ${scene.name}. \`aquarium off\` to close.`;
   },
 };
 

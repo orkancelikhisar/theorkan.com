@@ -24,7 +24,7 @@ export function updateRegatta(state: RegattaState, now: number, dtMs: number): v
   // --- wind dynamics (shifts + gusts) ---
   if (now >= state.nextShiftAt) {
     state.windTargetDeg += (Math.random() - 0.5) * 30;
-    state.windTargetKt = 3 + Math.random() * 6;
+    state.windTargetKt = 10 + Math.random() * 10;
     state.nextShiftAt = now + 20_000 + Math.random() * 20_000;
   }
   state.trueWindDeg += signedAngleDeg(state.windTargetDeg - state.trueWindDeg) * Math.min(1, dt / 8);
