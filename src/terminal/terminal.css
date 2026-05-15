@@ -23,6 +23,7 @@
   align-items: center;
   flex-wrap: nowrap;
   white-space: pre;
+  position: relative;
 }
 .terminal__prompt {
   display: inline-block;
@@ -41,5 +42,16 @@
   margin: 0;
   flex: 1 1 auto;
   min-width: 1ch;
-  caret-color: var(--bone);
+  caret-color: transparent;
 }
+.terminal__cursor {
+  position: absolute;
+  width: 0.6ch;
+  height: 1.1em;
+  background: var(--bone);
+  pointer-events: none;
+  animation: blink 1s steps(2, end) infinite;
+  top: 50%;
+  transform: translateY(-50%);
+}
+@keyframes blink { 50% { opacity: 0; } }

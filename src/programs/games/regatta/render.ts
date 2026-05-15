@@ -8,17 +8,13 @@ const VIEW_H = 480;
 const PX_PER_M = 2.2;
 const KT_TO_MS = 0.5144;
 
-interface Particle {
-  x: number; y: number;
-  vx: number; vy: number;
-  age: number; life: number;
-  kind: 'wake' | 'bow' | 'spray' | 'ripple';
-}
+// Water grid: a brick-pattern of `~` characters that scrolls 1:1 with the
+// boat's world position. The boat stays centered; the water moves underneath.
+const TILE_W = 36;
+const TILE_H = 24;
 
 export class RegattaRenderer {
   ctx: CanvasRenderingContext2D;
-  particles: Particle[] = [];
-  scrollOffsetMs = 0;
 
   constructor(public canvas: HTMLCanvasElement) {
     canvas.width = VIEW_W;
@@ -36,123 +32,50 @@ export class RegattaRenderer {
     return [cx + dx * PX_PER_M, cy - dy * PX_PER_M];
   }
 
-  draw(state: RegattaState, dtMs: number): void {
+  draw(state: RegattaState, _dtMs: number): void {
     const c = this.ctx;
+
+    // 1. Black background.
     c.fillStyle = '#0a0a0a';
     c.fillRect(0, 0, VIEW_W, VIEW_H);
 
-    const speedKt = magnitude(state.velocity) / KT_TO_MS;
-
-    // --- sea texture (scrolls 1:1 with world so motion is obvious) ---
-    this.scrollOffsetMs += dtMs;
-    const TILE = 22;
-    const sx = ((-state.position.x * PX_PER_M) % TILE + TILE) % TILE;
-    const sy = ((state.position.y  * PX_PER_M) % TILE + TILE) % TILE;
-    c.fillStyle = '#5e5c54';
-    for (let yi = -1; yi < VIEW_H / TILE + 2; yi++) {
-      for (let xi = -1; xi < VIEW_W / TILE + 2; xi++) {
-        const px = xi * TILE + sx;
-        const py = yi * TILE + sy;
-        c.fillRect(px, py, 1, 1);
-        if ((xi + yi) % 2 === 0) c.fillRect(px + 11, py + 11, 1, 1);
+    // 2. Water grid — brick-laid `~` tiles, scrolling 1:1 with boat position.
+    //    Boat moves +y (north) → tiles move down on screen (water flows aft).
+    //    Boat moves +x (east) → tiles move left on screen.
+    const sx = ((-state.position.x * PX_PER_M) % TILE_W + TILE_W) % TILE_W;
+    const sy = (( state.position.y * PX_PER_M) % TILE_H + TILE_H) % TILE_H;
+    c.font = '14px monospace';
+    c.textBaseline = 'middle';
+    c.textAlign = 'center';
+    c.fillStyle = '#6a6860';
+    for (let yi = -1; yi <= VIEW_H / TILE_H + 1; yi++) {
+      const rowOffset = (((yi % 2) + 2) % 2) === 0 ? 0 : TILE_W / 2;
+      for (let xi = -1; xi <= VIEW_W / TILE_W + 1; xi++) {
+        const px = xi * TILE_W + rowOffset + sx;
+        const py = yi * TILE_H + sy;
+        c.fillText('~', px, py);
       }
     }
-    // Long wave streaks aligned with wind, drifting downwind. Two layers at
-    // different depths so parallax sells the motion even at very low boat speed.
-    c.fillStyle = '#3a3935';
-    const wAngle = deg2rad(state.trueWindDeg);
-    const wsx = Math.sin(wAngle), wsy = -Math.cos(wAngle);
-    for (let i = 0; i < 18; i++) {
-      const phase = (this.scrollOffsetMs * 0.025 * state.trueWindKt + i * 137) % (VIEW_W + VIEW_H);
-      const ox = ((i * 73) % VIEW_W) + wsx * phase;
-      const oy = ((i * 41) % VIEW_H) + wsy * phase;
-      c.fillRect(((ox % VIEW_W) + VIEW_W) % VIEW_W,
-                 ((oy % VIEW_H) + VIEW_H) % VIEW_H,
-                 4, 1);
-    }
 
-    // --- wind ripples ---
-    if (Math.random() < 0.05) {
-      this.particles.push({
-        x: Math.random() * VIEW_W,
-        y: Math.random() * VIEW_H,
-        vx: Math.sin(deg2rad(state.trueWindDeg + 90)) * 0.5,
-        vy: -Math.cos(deg2rad(state.trueWindDeg + 90)) * 0.5,
-        age: 0, life: 3500, kind: 'ripple',
-      });
-    }
-
-    // --- buoys ---
+    // 3. Buoys.
     c.fillStyle = '#e8e6df';
-    c.font = '14px monospace';
-    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = '18px monospace';
     state.buoys.forEach((b, i) => {
       const [bx, by] = this.worldToScreen(state, b.pos.x, b.pos.y);
       if (b.rounded) c.globalAlpha = 0.4;
       c.fillText('◇', bx, by);
       if (i === state.nextBuoy && !b.rounded) {
-        c.font = '10px monospace';
+        c.font = '11px monospace';
         c.fillText(
           `next ${Math.round(Math.hypot(b.pos.x - state.position.x, b.pos.y - state.position.y))}m`,
-          bx, by + 16,
+          bx, by + 20,
         );
-        c.font = '14px monospace';
+        c.font = '18px monospace';
       }
       c.globalAlpha = 1;
     });
 
-    // --- update + draw particles ---
-    for (const p of this.particles) {
-      p.age += dtMs;
-      p.x += p.vx;
-      p.y += p.vy;
-      const a = 1 - p.age / p.life;
-      if (a <= 0) continue;
-      c.globalAlpha = a * (p.kind === 'ripple' ? 0.3 : 0.7);
-      c.fillRect(p.x, p.y, p.kind === 'bow' ? 2 : 1, 1);
-    }
-    c.globalAlpha = 1;
-    this.particles = this.particles.filter((p) => p.age < p.life);
-
-    // --- spawn wake (behind boat) — multiple per frame at higher speeds ---
-    if (speedKt > 0.2) {
-      const sternCount = Math.max(1, Math.floor(speedKt));
-      for (let i = 0; i < sternCount; i++) {
-        const jitter = (Math.random() - 0.5) * 2;
-        const sternX = VIEW_W / 2 - Math.sin(deg2rad(state.heading)) * (6 + i * 1.5) + jitter;
-        const sternY = VIEW_H / 2 + Math.cos(deg2rad(state.heading)) * (6 + i * 1.5) + jitter;
-        this.particles.push({ x: sternX, y: sternY, vx: 0, vy: 0, age: 0, life: 2400, kind: 'wake' });
-      }
-    }
-
-    // --- spawn bow wave (lower threshold so slow boats also have it) ---
-    if (speedKt > 0.6) {
-      const sp = Math.min(5, Math.floor(speedKt));
-      for (let i = 0; i < sp; i++) {
-        const bowX = VIEW_W / 2 + Math.sin(deg2rad(state.heading)) * 6;
-        const bowY = VIEW_H / 2 - Math.cos(deg2rad(state.heading)) * 6;
-        const spread = (Math.random() - 0.5) * 1.2;
-        this.particles.push({
-          x: bowX, y: bowY,
-          vx: Math.sin(deg2rad(state.heading + 90 * (spread > 0 ? 1 : -1))) * (0.4 + Math.random() * 0.6),
-          vy: -Math.cos(deg2rad(state.heading + 90 * (spread > 0 ? 1 : -1))) * (0.4 + Math.random() * 0.6),
-          age: 0, life: 1200, kind: 'bow',
-        });
-      }
-    }
-
-    // --- spawn heel spray ---
-    if (Math.abs(state.heel) > 7) {
-      this.particles.push({
-        x: VIEW_W / 2 + Math.sin(deg2rad(state.heading)) * 5,
-        y: VIEW_H / 2 - Math.cos(deg2rad(state.heading)) * 5,
-        vx: Math.sin(deg2rad(state.heading + 90 * Math.sign(state.heel))) * 1.4,
-        vy: -Math.cos(deg2rad(state.heading + 90 * Math.sign(state.heel))) * 1.4 + 0.5,
-        age: 0, life: 600, kind: 'spray',
-      });
-    }
-
-    // --- boat: hollow triangle + boom inside ---
+    // 4. Boat — hollow triangle hull + boom inside, centered on the canvas.
     c.save();
     c.translate(VIEW_W / 2, VIEW_H / 2);
     c.rotate(deg2rad(state.heading) + deg2rad(state.heel) * 0.05);
@@ -162,23 +85,17 @@ export class RegattaRenderer {
 
     // hollow triangle (bow at -y in local space)
     c.beginPath();
-    c.moveTo(0, -10);
-    c.lineTo(5, 6);
-    c.lineTo(-5, 6);
+    c.moveTo(0, -12);
+    c.lineTo(6, 7);
+    c.lineTo(-6, 7);
     c.closePath();
     c.stroke();
 
-    // boom: rotates around centroid (0, 1) of the triangle.
-    // sailAngleDeg is the actual boom angle (signed, -90..+90, 0 = centerline aft).
-    // chord direction (along boom from mast aft to clew):
-    //   chord = (sin(a), -cos(a))   in screen-local frame the boat draws in
-    // We want to draw boom from centroid by 9 px along the chord (boom extends aft+sideways from mast).
-    // In our local frame here, +y is "up" (= forward = bow) because we drew the bow at -y... wait
-    // we drew bow at -10 (y = -10) → -y is bow, +y is stern. So aft direction is +y here.
-    // chord direction in screen-local: (sin(a), cos(a)) — sin gives starboard component, cos gives aft.
+    // boom rotating around the centroid with the actual sail angle
     const a = deg2rad(state.sailAngleDeg);
-    const boomEndX = Math.sin(a) * 9;
-    const boomEndY = Math.cos(a) * 9;
+    const boomLen = 11;
+    const boomEndX = Math.sin(a) * boomLen;
+    const boomEndY = Math.cos(a) * boomLen;
     c.beginPath();
     c.moveTo(0, 1);
     if (state.luffing) {
@@ -189,25 +106,25 @@ export class RegattaRenderer {
     }
     c.stroke();
 
-    // --- mainsheet limit indicator: two faint marks where sail will hit the rope ---
+    // mainsheet limit indicator — faint ticks where the rope clamps the sail
     c.globalAlpha = 0.35;
     const aMax = deg2rad(state.sailMaxDeg);
-    const limitR = 12;
     for (const sign of [-1, 1]) {
-      const lx = Math.sin(aMax * sign) * limitR;
-      const ly = Math.cos(aMax * sign) * limitR;
+      const lx = Math.sin(aMax * sign) * 14;
+      const ly = Math.cos(aMax * sign) * 14;
       c.beginPath();
       c.moveTo(lx, ly);
-      c.lineTo(lx * 1.1, ly * 1.1);
+      c.lineTo(lx * 1.18, ly * 1.18);
       c.stroke();
     }
     c.globalAlpha = 1;
     c.restore();
 
-    // --- HUD ---
+    // 5. HUD.
     c.fillStyle = '#e8e6df';
     c.font = '12px monospace';
     c.textAlign = 'left'; c.textBaseline = 'top';
+    const speedKt = magnitude(state.velocity) / KT_TO_MS;
     const trueVec = vec(state.trueWindDeg, state.trueWindKt * KT_TO_MS);
     const ap = apparentWind(trueVec, state.velocity);
     const apSigned = signedAngleDeg(headingOf(ap) - state.heading);
