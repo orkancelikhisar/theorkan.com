@@ -44,8 +44,9 @@ const prog: Program = {
     const closeBtn = document.createElement('button');
     closeBtn.className = 'regatta-close';
     closeBtn.type = 'button';
-    closeBtn.textContent = '× quit';
+    closeBtn.textContent = '×';
     closeBtn.title = 'quit (q / esc)';
+    closeBtn.setAttribute('aria-label', 'quit');
     closeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       close();

@@ -4,13 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ASCII Sailing Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
   body {
     margin: 0;
     overflow: hidden;
-    background-color: #000;
+    background-color: #0a0a0a;
     color: #e8e6df;
-    font-family: monospace;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   canvas {
     display: block;
@@ -22,10 +32,13 @@
     top: 10px;
     left: 10px;
     pointer-events: none;
-    font-size: 16px;
+    font-family: var(--font-mono);
+    font-size: 12px;
     line-height: 1.5;
+    letter-spacing: 0.5px;
     white-space: pre;
-    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    color: #e8e6df;
+    text-shadow: 1px 1px 0 #0a0a0a, -1px -1px 0 #0a0a0a, 1px -1px 0 #0a0a0a, -1px 1px 0 #0a0a0a;
   }
 </style>
 </head>
@@ -39,10 +52,17 @@
 
   let width, height;
   function resize() {
+    // Render at device pixel resolution so text/glyphs stay sharp on Retina.
+    // Game logic still works in CSS pixels — the ctx.scale below handles it.
+    const dpr = window.devicePixelRatio || 1;
     width = window.innerWidth;
     height = window.innerHeight;
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
   }
@@ -128,11 +148,11 @@
     const gh = game.gridHeight;
     let grid = new Array(gw * gh).fill(0);
     
-    const numBlobs = 10 + Math.random() * 8;
+    const numBlobs = 5 + Math.random() * 4;
     for(let i=0; i<numBlobs; i++) {
       let cx = Math.floor(Math.random() * gw);
       let cy = Math.floor(Math.random() * gh);
-      let r = 4 + Math.random() * 12;
+      let r = 2 + Math.random() * 4;
       for(let dy=-r; dy<=r; dy++) {
         for(let dx=-r; dx<=r; dx++) {
           if (dx*dx + dy*dy <= r*r) {
@@ -479,7 +499,7 @@
     const gw = game.gridWidth;
     const gh = game.gridHeight;
     if (gw === 0) return;
-    ctx.font = '12px monospace';
+    ctx.font = '12px "JetBrains Mono", ui-monospace, monospace';
     for(let y=0; y<gh; y++) {
       for(let x=0; x<gw; x++) {
         let cell = game.grid[y*gw + x];
@@ -502,31 +522,22 @@
     // Draw Map
     drawMap();
 
-    // Draw Raki Goal
+    // Draw Goal — a small shiny dot.
     if (game.goal.x > 0) {
       const gx = game.goal.x;
       const gy = game.goal.y;
-      
       const goalPulse = 0.5 + 0.5 * Math.sin(Date.now() / 200);
-      ctx.globalAlpha = 0.8 + 0.2 * goalPulse;
-      ctx.font = 'bold 16px monospace';
-      
+      ctx.globalAlpha = 0.4 + 0.6 * goalPulse;
       ctx.fillStyle = '#e8e6df';
-      ctx.fillText('\\   /', gx, gy - 20);
-      ctx.fillText(' | | ', gx, gy - 10);
-      ctx.fillStyle = '#d8d5cc';
-      ctx.fillText(' |*| ', gx, gy);
-      ctx.fillText(' |*| ', gx, gy + 10);
-      ctx.fillStyle = '#e8e6df';
-      ctx.fillText(' --- ', gx, gy + 20);
-      
+      ctx.font = 'bold 14px "JetBrains Mono", ui-monospace, monospace';
+      ctx.fillText('●', gx, gy);
       ctx.globalAlpha = 1.0;
     }
 
     ctx.fillStyle = '#e8e6df';
 
     // Wind particles
-    ctx.font = '14px monospace';
+    ctx.font = '14px "JetBrains Mono", ui-monospace, monospace';
     const time = Date.now() / 1000;
     for (let i = 0; i < 60; i++) {
       const wx = (i * 123 + time * env.windSpeed * 20 * Math.sin(env.windHeading)) % width;
@@ -540,7 +551,7 @@
     }
     
     // Draw Wake Particles
-    ctx.font = '12px monospace';
+    ctx.font = '12px "JetBrains Mono", ui-monospace, monospace';
     for (const p of wakeParticles) {
       ctx.globalAlpha = p.life * 0.5;
       ctx.fillStyle = '#88857c';
@@ -555,9 +566,9 @@
     ctx.rotate(boat.heading);
     ctx.scale(0.7, 0.7); // Scale boat visual down by 30%
 
-    ctx.font = 'bold 18px monospace';
+    ctx.font = 'bold 18px "JetBrains Mono", ui-monospace, monospace';
     ctx.fillText('^', 0, -25);
-    ctx.font = '16px monospace';
+    ctx.font = '16px "JetBrains Mono", ui-monospace, monospace';
     ctx.fillText('/ \\', 0, -15);
     ctx.fillText('| |', 0, -5);
     ctx.fillText('| |', 0, 5);
@@ -590,7 +601,7 @@
     
     // Draw Mainsheet Rope
     ctx.fillStyle = '#5a5854';
-    ctx.font = '12px monospace';
+    ctx.font = '12px "JetBrains Mono", ui-monospace, monospace';
     for(let i=1; i<boat.rope.length-1; i++) {
        ctx.fillText('.', boat.rope[i].x, boat.rope[i].y);
     }
@@ -602,7 +613,7 @@
     const indicatorY = 80;
     
     ctx.fillStyle = '#e8e6df';
-    ctx.font = '16px monospace';
+    ctx.font = '16px "JetBrains Mono", ui-monospace, monospace';
     ctx.fillText('WIND', indicatorX, indicatorY - 45);
     
     ctx.globalAlpha = 0.5;
@@ -615,7 +626,7 @@
     ctx.save();
     ctx.translate(indicatorX, indicatorY);
     ctx.rotate(env.windHeading);
-    ctx.font = 'bold 20px monospace';
+    ctx.font = 'bold 20px "JetBrains Mono", ui-monospace, monospace';
     ctx.fillText('v', 0, 15);
     ctx.fillText('|', 0, 5);
     ctx.fillText('|', 0, -5);
