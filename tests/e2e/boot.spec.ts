@@ -64,7 +64,8 @@ test('regatta launches and quits cleanly', async ({ page }) => {
   await page.keyboard.type('regatta');
   await page.keyboard.press('Enter');
   await expect(page.locator('.regatta-overlay')).toBeVisible({ timeout: 5_000 });
-  // The game runs inside an iframe that captures keys; quit via the × button.
-  await page.locator('.regatta-close').click();
+  // Game posts 'regatta:quit' to the parent on Q/Esc; window-level capture
+  // also handles q when focus is on the parent shell. Either path works.
+  await page.keyboard.press('q');
   await expect(page.locator('.regatta-overlay')).toBeHidden({ timeout: 2_000 });
 });

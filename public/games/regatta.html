@@ -58,6 +58,13 @@
   };
 
   window.addEventListener('keydown', e => {
+    // Quit hook for theOrkan.OS host — let the parent shell close the iframe.
+    if (e.code === 'KeyQ' || e.code === 'Escape') {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage('regatta:quit', '*');
+      }
+      return;
+    }
     if (keys.hasOwnProperty(e.code)) {
       keys[e.code] = true;
     }

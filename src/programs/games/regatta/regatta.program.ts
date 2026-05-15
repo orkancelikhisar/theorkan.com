@@ -2,11 +2,12 @@ import './regatta.css';
 import type { Program } from '../../../kernel/program';
 
 // The regatta game lives as a static asset at public/games/regatta.html.
-// This program opens a full-viewport overlay with that file in an iframe,
-// keeping the OS shell experience intact (no new browser window).
+// This program opens a centered window containing that file in an iframe,
+// matching how the other modal games (snake, life, 2048) present.
 
 let overlay: HTMLDivElement | null = null;
 let escListener: ((e: KeyboardEvent) => void) | null = null;
+let msgListener: ((e: MessageEvent) => void) | null = null;
 
 function close(): void {
   if (overlay) overlay.remove();
@@ -15,11 +16,15 @@ function close(): void {
     window.removeEventListener('keydown', escListener, true);
     escListener = null;
   }
+  if (msgListener) {
+    window.removeEventListener('message', msgListener);
+    msgListener = null;
+  }
 }
 
 const prog: Program = {
   name: 'regatta',
-  manpage: 'regatta — single-handed sailing simulator. ← → steer, ↑ ↓ mainsheet. esc/× to quit.',
+  manpage: 'regatta — single-handed sailing simulator. ← → steer, ↑ ↓ mainsheet. q or × to quit.',
   category: 'game',
   mode: 'modal',
   init: () => {
@@ -27,46 +32,50 @@ const prog: Program = {
     overlay = document.createElement('div');
     overlay.className = 'regatta-overlay';
 
+    const win = document.createElement('div');
+    win.className = 'regatta-window';
+
     const iframe = document.createElement('iframe');
     iframe.className = 'regatta-iframe';
     iframe.src = 'games/regatta.html';
     iframe.title = 'regatta';
-    overlay.appendChild(iframe);
+    win.appendChild(iframe);
 
     const closeBtn = document.createElement('button');
     closeBtn.className = 'regatta-close';
     closeBtn.type = 'button';
     closeBtn.textContent = '× quit';
-    closeBtn.title = 'quit (esc)';
+    closeBtn.title = 'quit (q / esc)';
     closeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       close();
     });
-    overlay.appendChild(closeBtn);
+    win.appendChild(closeBtn);
 
+    overlay.appendChild(win);
     document.body.appendChild(overlay);
 
-    // Give the iframe focus so arrow keys reach the game immediately.
     iframe.addEventListener('load', () => {
       try { iframe.contentWindow?.focus(); } catch { /* ignore */ }
     });
 
-    // Listen for Esc at the capture phase. The iframe's own keydown handler
-    // doesn't intercept Esc (game uses arrows only), so this works regardless
-    // of whether focus is in the parent or the iframe.
+    // Backup quit when focus is on the parent (e.g. user clicked the chrome).
     escListener = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' || e.key === 'q' || e.key === 'Q') {
         e.preventDefault();
         close();
       }
     };
     window.addEventListener('keydown', escListener, true);
+
+    // Primary quit path — the game posts 'regatta:quit' on Q/Esc from inside.
+    msgListener = (e: MessageEvent): void => {
+      if (e.data === 'regatta:quit') close();
+    };
+    window.addEventListener('message', msgListener);
   },
-  // The iframe handles its own input. These stubs satisfy the modal contract
-  // tested in registry.test.ts; the kernel's modal key-router calls them as
-  // no-ops while the iframe has focus.
-  onKey: () => { /* no-op — keys flow into the iframe */ },
-  render: () => { /* no-op — iframe drives its own RAF loop */ },
+  onKey: () => { /* iframe owns its own keys */ },
+  render: () => { /* iframe drives its own RAF */ },
   cleanup: () => close(),
 };
 
