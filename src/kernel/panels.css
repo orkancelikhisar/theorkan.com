@@ -19,7 +19,22 @@
   margin-bottom: 6px;
   border-bottom: 1px solid var(--bone-faint);
   padding-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+.panel__title-text { flex: 1; }
+.panel__close {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--bone-dim);
+  cursor: pointer;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+}
+.panel__close:hover { color: var(--bone); }
 .panel__content {
   white-space: pre-wrap;
 }
