@@ -165,9 +165,19 @@ async function main(): Promise<void> {
     return p;
   }
   function refreshPrompt(): void {
-    terminal.setPrompt(`orkan@theorkan:${shortenCwd(shell.state.cwd)}$ `);
+    // The terminal prompt must always match the actual input mode — otherwise
+    // the visitor sees `orkan@theorkan:~$` and types thinking it's a shell
+    // command, when in fact they're still in dilenci's offer mode.
+    if (dilenci?.isInOfferMode()) {
+      terminal.setPrompt('tell him: ');
+    } else {
+      terminal.setPrompt(`orkan@theorkan:${shortenCwd(shell.state.cwd)}$ `);
+    }
   }
   refreshPrompt();
+  // Sync the prompt whenever dilenci enters or leaves offer mode.
+  events.on('dilenci:offer-opened', refreshPrompt);
+  events.on('dilenci:offer-closed', refreshPrompt);
 
   // Submit handler
   terminal.onSubmit(async (line) => {
