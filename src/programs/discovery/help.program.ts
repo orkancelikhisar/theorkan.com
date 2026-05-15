@@ -11,6 +11,8 @@ const prog: Program = {
     '',
     'INFO         whoami   about   projects   contact   man-orkan   cv pdf',
     'GAMES        snake    2048    regatta    life    aquarium',
+    'ART          gallery  latent   currency',
+    'MUSIC        music ls   music play <name>   music pause / skip / stop',
     'UTILS        cowsay   fortune   figlet   ping   top   ps',
     '             date   uname   uptime   weather   tree   which   whatis   say',
     'DEVICES      cat /dev/heart   /dev/wind   /dev/harbor   /dev/salt   /dev/regret',
