@@ -37,16 +37,49 @@ export function createTerminal(root: HTMLElement): TerminalAPI {
   inputEl.autocomplete = 'off';
   inputEl.setAttribute('autocapitalize', 'off');
   inputEl.setAttribute('autocorrect', 'off');
-  promptLine.append(promptEl, inputEl);
+  const cursorEl = document.createElement('span');
+  cursorEl.className = 'terminal__cursor';
+  promptLine.append(promptEl, inputEl, cursorEl);
   term.appendChild(promptLine);
 
   let mode: 'shell' | 'offer' | 'modal' = 'shell';
   const submitListeners: Array<(line: string) => void> = [];
   const keyListeners: Array<(e: KeyboardEvent) => void> = [];
 
+  // Position the block cursor over the input at the current selectionStart.
+  // Monospace font means one character is exactly 1 ch wide. We compute the
+  // cursor's left offset as: input.offsetLeft + selectionStart * charWidth(px).
+  function measureCharPx(): number {
+    const probe = document.createElement('span');
+    probe.style.visibility = 'hidden';
+    probe.style.position = 'absolute';
+    probe.style.font = window.getComputedStyle(inputEl).font;
+    probe.textContent = '0';
+    document.body.appendChild(probe);
+    const w = probe.getBoundingClientRect().width;
+    probe.remove();
+    return w || 8;
+  }
+  let charPx = measureCharPx();
+
+  function syncCursor(): void {
+    const pos = inputEl.selectionStart ?? inputEl.value.length;
+    const left = inputEl.offsetLeft + pos * charPx;
+    cursorEl.style.left = `${left}px`;
+  }
+
+  inputEl.addEventListener('input', syncCursor);
+  inputEl.addEventListener('keyup', syncCursor);
+  inputEl.addEventListener('click', syncCursor);
+  inputEl.addEventListener('select', syncCursor);
+  window.addEventListener('resize', () => { charPx = measureCharPx(); syncCursor(); });
+
   inputEl.addEventListener('keydown', (e) => {
     for (const l of keyListeners) l(e);
-    if (e.defaultPrevented) return;
+    if (e.defaultPrevented) {
+      requestAnimationFrame(syncCursor);
+      return;
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
       const line = inputEl.value;
@@ -57,11 +90,14 @@ export function createTerminal(root: HTMLElement): TerminalAPI {
       lines.appendChild(archived);
       for (const cb of submitListeners) cb(line);
       term.scrollTop = term.scrollHeight;
+      syncCursor();
+    } else {
+      requestAnimationFrame(syncCursor);
     }
   });
 
   // Focus management — clicking anywhere refocuses the input, except inside
-  // modal overlays / panels where the user is interacting elsewhere.
+  // panels / modal overlays where the user is interacting elsewhere.
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement | null;
     if (target && target.closest(
@@ -69,8 +105,11 @@ export function createTerminal(root: HTMLElement): TerminalAPI {
       '.stowaway-flash, .panel, .panel__close',
     )) return;
     inputEl.focus();
+    syncCursor();
   });
   inputEl.focus();
+  // Initial cursor position once layout has settled.
+  requestAnimationFrame(syncCursor);
 
   return {
     print(text, opts) {
@@ -92,7 +131,10 @@ export function createTerminal(root: HTMLElement): TerminalAPI {
     },
     clear() { lines.innerHTML = ''; },
     scrollToBottom() { term.scrollTop = term.scrollHeight; },
-    setPrompt(prompt) { promptEl.textContent = prompt; },
+    setPrompt(prompt) {
+      promptEl.textContent = prompt;
+      requestAnimationFrame(syncCursor);
+    },
     setInputMode(m) { mode = m; },
     getMode() { return mode; },
     onSubmit(cb) { submitListeners.push(cb); },
@@ -101,9 +143,9 @@ export function createTerminal(root: HTMLElement): TerminalAPI {
     getInputValue() { return inputEl.value; },
     setInputValue(v) {
       inputEl.value = v;
-      // place caret at end
       inputEl.setSelectionRange(v.length, v.length);
+      syncCursor();
     },
-    focus() { inputEl.focus(); },
+    focus() { inputEl.focus(); syncCursor(); },
   };
 }

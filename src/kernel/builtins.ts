@@ -64,7 +64,13 @@ export function createBuiltins(
         if (!state.previousCwd) { out('cd: OLDPWD not set'); return; }
         target = state.previousCwd;
       }
-      const resolved = fs.resolve(target, state.cwd);
+      // Friendly fallback: bare names like `cd dev` should also find /dev
+      // when there's no `./dev` in the current directory.
+      let resolved = fs.resolve(target, state.cwd);
+      if (!fs.exists(resolved) && !target.startsWith('/') && !target.startsWith('~') && !target.startsWith('.')) {
+        const abs = fs.resolve('/' + target);
+        if (fs.exists(abs)) resolved = abs;
+      }
       if (!fs.exists(resolved)) { out(`cd: ${argv[1]}: no such file or directory`); return; }
       const node = fs.getNode(resolved);
       if (!node || node.type !== 'dir') { out(`cd: ${argv[1]}: not a directory`); return; }
@@ -191,7 +197,7 @@ export function createBuiltins(
       function walk(path: string, prefix: string): void {
         const node = fs.getNode(path);
         if (!node || node.type !== 'dir' || !node.children) return;
-        const names = Object.keys(node.children).filter((n) => !n.startsWith('.'));
+        const names = Object.keys(node.children);
         names.forEach((name, i) => {
           const last = i === names.length - 1;
           out(prefix + (last ? '└── ' : '├── ') + name);
