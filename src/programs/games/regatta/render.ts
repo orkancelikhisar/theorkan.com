@@ -5,13 +5,16 @@ import type { RegattaState } from './state';
 
 const VIEW_W = 800;
 const VIEW_H = 480;
-const PX_PER_M = 2.2;
+const PX_PER_M = 4;             // zoom-in (was 2.2)
 const KT_TO_MS = 0.5144;
 
-// Water grid: a brick-pattern of `~` characters that scrolls 1:1 with the
-// boat's world position. The boat stays centered; the water moves underneath.
-const TILE_W = 36;
-const TILE_H = 24;
+// Water grid: a brick-laid pattern of `~` characters anchored to fixed
+// world positions. The boat stays centered; each tile is projected from
+// world → screen so its brick offset (even/odd row) is tied to the world
+// row index, not the on-screen loop index. That eliminates the parity
+// flip that made earlier tiles seem to jitter sideways.
+const TILE_W_WORLD = 9;          // metres per tile horizontally
+const TILE_H_WORLD = 6;          // metres per tile vertically
 
 export class RegattaRenderer {
   ctx: CanvasRenderingContext2D;
@@ -39,21 +42,29 @@ export class RegattaRenderer {
     c.fillStyle = '#0a0a0a';
     c.fillRect(0, 0, VIEW_W, VIEW_H);
 
-    // 2. Water grid — brick-laid `~` tiles, scrolling 1:1 with boat position.
-    //    Boat moves +y (north) → tiles move down on screen (water flows aft).
-    //    Boat moves +x (east) → tiles move left on screen.
-    const sx = ((-state.position.x * PX_PER_M) % TILE_W + TILE_W) % TILE_W;
-    const sy = (( state.position.y * PX_PER_M) % TILE_H + TILE_H) % TILE_H;
+    // 2. Water grid — anchor each tile to its world row/col so the brick
+    //    offset is a property of the world, not the screen loop.
+    //    Range of visible world tile indices:
+    const halfWmeters = VIEW_W / (2 * PX_PER_M);
+    const halfHmeters = VIEW_H / (2 * PX_PER_M);
+    const iMin = Math.floor((state.position.x - halfWmeters) / TILE_W_WORLD) - 1;
+    const iMax = Math.ceil( (state.position.x + halfWmeters) / TILE_W_WORLD) + 1;
+    const jMin = Math.floor((state.position.y - halfHmeters) / TILE_H_WORLD) - 1;
+    const jMax = Math.ceil( (state.position.y + halfHmeters) / TILE_H_WORLD) + 1;
     c.font = '14px monospace';
     c.textBaseline = 'middle';
     c.textAlign = 'center';
     c.fillStyle = '#6a6860';
-    for (let yi = -1; yi <= VIEW_H / TILE_H + 1; yi++) {
-      const rowOffset = (((yi % 2) + 2) % 2) === 0 ? 0 : TILE_W / 2;
-      for (let xi = -1; xi <= VIEW_W / TILE_W + 1; xi++) {
-        const px = xi * TILE_W + rowOffset + sx;
-        const py = yi * TILE_H + sy;
-        c.fillText('~', px, py);
+    for (let j = jMin; j <= jMax; j++) {
+      // brick offset tied to the world row index — stays consistent when
+      // the boat scrolls past a row boundary.
+      const oddRow = (((j % 2) + 2) % 2) === 1;
+      const xOffset = oddRow ? TILE_W_WORLD / 2 : 0;
+      for (let i = iMin; i <= iMax; i++) {
+        const wx = i * TILE_W_WORLD + xOffset;
+        const wy = j * TILE_H_WORLD;
+        const [sx2, sy2] = this.worldToScreen(state, wx, wy);
+        c.fillText('~', sx2, sy2);
       }
     }
 
