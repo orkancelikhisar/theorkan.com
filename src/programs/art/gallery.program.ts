@@ -46,6 +46,17 @@ function showFrames(w: GalleryWork): void {
   }, interval);
 }
 
+function showGenerated(w: GalleryWork): void {
+  if (!artEl || !w.generator) return;
+  let frame = 0;
+  artEl.textContent = w.generator(frame);
+  frameTimer = window.setInterval(() => {
+    if (!artEl || !w.generator) return;
+    frame += 1;
+    artEl.textContent = w.generator(frame);
+  }, 33);                                          // ~30fps
+}
+
 async function ensureLoaded(w: GalleryWork): Promise<void> {
   if (!w.isVideo || w.frames) return;
   if (!w.loader) return;
@@ -78,6 +89,7 @@ async function render(): Promise<void> {
   }
 
   if (w.frames && w.frames.length) showFrames(w);
+  else if (w.generator) showGenerated(w);
   else showStatic(w);
 }
 
