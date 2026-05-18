@@ -9,7 +9,7 @@ const prog: Program = {
     '',
     'theOrkan.OS — commands. type `man <name>` for details on any.',
     '',
-    'INFO         whoami   about   projects   contact   man-orkan   cv pdf',
+    'INFO         whoami   about   projects   contact   man-orkan   cv pdf   walk',
     'GAMES        snake    2048    regatta    life    aquarium',
     'ART          gallery  latent   currency',
     'MUSIC        music ls   music play <name>   music pause / skip / stop',

@@ -65,6 +65,10 @@ export interface Program {
   manpage: string;
   category: ProgramCategory;
   mode: ProgramMode;
+  // For modal programs: the CSS selector of the overlay element they mount.
+  // Used by the shell to (a) route keypresses to the program's onKey while
+  // the overlay is present, and (b) skip terminal-refocus on clicks inside.
+  overlaySelector?: string;
   init?(ctx: ProgramContext): void | Promise<void>;
   render?(ctx: ProgramContext): void;
   onKey?(ctx: ProgramContext, key: KeyEvent): void;

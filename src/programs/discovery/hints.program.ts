@@ -20,6 +20,7 @@ const prog: Program = {
       "some are commands you haven't typed. try `tab` after a letter.",
       'some are people. one is a beggar.',
       'some are silent. some sing.',
+      'one is a `walk`. ten places. you bring yourself.',
       '',
       'try `man -k threads` to see open trails.',
       '',

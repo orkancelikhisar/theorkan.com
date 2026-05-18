@@ -98,12 +98,13 @@ export function createTerminal(root: HTMLElement): TerminalAPI {
   });
 
   // Focus management — clicking anywhere refocuses the input, except inside
-  // panels / modal overlays where the user is interacting elsewhere.
+  // panels / modal overlays where the user is interacting elsewhere. The
+  // `[class*="-overlay"]` pattern matches any modal element by convention, so
+  // new modal programs don't need to touch this file.
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement | null;
     if (target && target.closest(
-      '.snake-overlay, .t2048-overlay, .life-overlay, .regatta-overlay, ' +
-      '.stowaway-flash, .panel, .panel__close',
+      '[class*="-overlay"], .stowaway-flash, .panel, .panel__close',
     )) return;
     inputEl.focus();
     syncCursor();
@@ -111,6 +112,12 @@ export function createTerminal(root: HTMLElement): TerminalAPI {
   inputEl.focus();
   // Initial cursor position once layout has settled.
   requestAnimationFrame(syncCursor);
+
+  // When the window itself regains focus (tab-switch back, alt-tab, etc.),
+  // restore focus to the input — without this, modal programs (walk,
+  // gallery, etc.) stop receiving keys because their key-routing relies on
+  // the input being the active element.
+  window.addEventListener('focus', () => { inputEl.focus(); syncCursor(); });
 
   return {
     print(text, opts) {
