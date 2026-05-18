@@ -210,12 +210,15 @@ async function main(): Promise<void> {
   terminal.onKey((e) => {
     // If a modal is active and overlay still in DOM, route keys to it
     if (modalProgram) {
-      const overlayClass = modalProgram.name === 'snake' ? '.snake-overlay'
-        : modalProgram.name === '2048' ? '.t2048-overlay'
-        : modalProgram.name === 'life' ? '.life-overlay'
-        : modalProgram.name === 'regatta' ? '.regatta-overlay'
-        : modalProgram.name === 'gallery' ? '.gallery-overlay'
-        : null;
+      // Programs declare their overlay selector. Fallback map covers existing
+      // modals that haven't been migrated to the declarative field yet.
+      const overlayClass = modalProgram.overlaySelector
+        ?? (modalProgram.name === 'snake' ? '.snake-overlay'
+          : modalProgram.name === '2048' ? '.t2048-overlay'
+          : modalProgram.name === 'life' ? '.life-overlay'
+          : modalProgram.name === 'regatta' ? '.regatta-overlay'
+          : modalProgram.name === 'gallery' ? '.gallery-overlay'
+          : null);
       const overlayPresent = overlayClass ? document.querySelector(overlayClass) : null;
       if (overlayPresent) {
         modalProgram.onKey?.(ctxFactory([]), {

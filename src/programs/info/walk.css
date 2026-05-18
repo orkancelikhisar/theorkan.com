@@ -1,0 +1,123 @@
+.walk-overlay {
+  position: fixed; inset: 0;
+  z-index: 100;
+  background: var(--void);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.walk-frame {
+  position: relative;
+  width: min(96vw, 820px);
+  border: 1px solid var(--bone-faint);
+  background: var(--void);
+  color: var(--bone);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 24px 28px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.walk-frame__top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--bone-dim);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: lowercase;
+  border-bottom: 1px solid var(--bone-faint);
+  padding-bottom: 8px;
+}
+
+.walk-frame__title {
+  color: var(--bone);
+  letter-spacing: 2px;
+  flex: 1;
+}
+
+.walk-frame__counter {
+  color: var(--bone-faint);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+}
+
+.walk-frame__close {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--bone-dim);
+  background: var(--void);
+  border: 1px solid var(--bone-faint);
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.walk-frame__close:hover { color: var(--bone); border-color: var(--bone-dim); }
+
+.walk-frame__map {
+  margin: 0;
+  white-space: pre;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.08;
+  letter-spacing: 0;
+  user-select: none;
+  text-align: left;
+  align-self: center;
+  /* doryen-ish: tight grid, no extra spacing between cells */
+}
+
+/* Per-tile intensity tiers. The whole rendering pipeline drops every cell
+   into one of these classes; the player sits in its own class on top. */
+.walk__tile               { color: var(--bone-dim); }
+.walk__tile--bright       { color: var(--bone); }
+.walk__tile--normal       { color: var(--bone-dim); }
+.walk__tile--dim          { color: var(--bone-faint); }
+.walk__tile--faint        { color: var(--bone-faint); opacity: 0.5; }
+.walk__tile--water        { color: var(--bone-faint); opacity: 0.55; }
+
+.walk__tile--player {
+  color: var(--bone);
+  font-weight: 700;
+  /* No animation here — restarting it on every move causes visible stutter
+     and the text-shadow blur was a per-paint cost. Movement should feel
+     instant. */
+}
+
+.walk-frame__prose {
+  white-space: pre-wrap;
+  color: var(--bone);
+  font-size: 13px;
+  line-height: 1.7;
+  min-height: 60px;
+  border-top: 1px solid var(--bone-faint);
+  padding-top: 12px;
+}
+
+.walk-frame__hint {
+  color: var(--bone);
+  font-size: 11px;
+  letter-spacing: 1px;
+  min-height: 16px;
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+
+.walk-frame__keys {
+  color: var(--bone-faint);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-align: center;
+  border-top: 1px solid var(--bone-faint);
+  padding-top: 8px;
+}
