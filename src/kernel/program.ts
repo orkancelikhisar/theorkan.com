@@ -28,6 +28,7 @@ export interface ProgramContext {
   panel: {
     spawn(opts: PanelOptions): string;
     close(id: string): void;
+    closeAll(): void;
     update(id: string, content: string): void;
     focus(id: string): void;
   };

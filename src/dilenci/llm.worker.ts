@@ -29,10 +29,9 @@ function post(msg: OutMsg): void {
   (self as unknown as Worker).postMessage(msg);
 }
 
-// 360M is the smallest SmolLM2 variant that actually engages with the input.
-// 135M generates style-matched ramble that ignores the visitor entirely.
-// With WebGPU active the 360M model loads and infers fast enough that the
-// original "wait time" complaint goes away.
+// SmolLM2-360M-Instruct — known-good. Qwen2.5-0.5B-Instruct at q4f16 was
+// degenerating into repetitive nonsense (the 0.5B variant takes too hard a
+// quality hit from 4-bit quantization). 360M holds up better at this size.
 const MODEL_ID = 'HuggingFaceTB/SmolLM2-360M-Instruct';
 
 async function loadWith(device: 'webgpu' | 'wasm'): Promise<TextGenerationPipeline> {

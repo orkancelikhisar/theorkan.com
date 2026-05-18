@@ -17,7 +17,7 @@ const prog: Program = {
     'DESCRIPTION',
     '    Engineer (TUM, Boğaziçi), artist, musician, sailor.',
     '    Co-founder of wearefakt.com. Launched baldyapp.com.',
-    '    3rd place skipper, Arkas Aegean Regatta 2024.',
+    '    Sailor — captain, skipper.',
     '',
     'DEPRECATED VALUES (see /etc/orkan.conf)',
     '    passion=enabled              # rejected by current build',

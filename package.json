@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests --ext .ts",
     "format": "prettier --write \"src/**/*.{ts,css,json}\"",
-    "new:program": "tsx scripts/new-program.ts"
+    "new:program": "tsx scripts/new-program.ts",
+    "video:build": "tsx scripts/video-to-ascii.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.45.0",

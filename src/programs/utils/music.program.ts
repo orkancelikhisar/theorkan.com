@@ -17,7 +17,7 @@ function ensure(): { engine: MusicAPI; panel: MusicPanelAPI } {
 
 const prog: Program = {
   name: 'music',
-  manpage: 'music — orkan\'s ambient pieces.\n  music ls         list tracks\n  music play [name]  start a track (default: first one)\n  music pause      pause current\n  music resume     resume after pause\n  music skip       next track\n  music stop       stop and close the panel',
+  manpage: 'music — orkan\'s ambient pieces.\n  music ls         list tracks\n  music play [name]  start a track (default: first one)\n  music pause      pause current\n  music resume     resume after pause\n  music prev       previous track\n  music skip       next track\n  music restart    restart the current track\n  music stop       stop and close the panel',
   category: 'music',
   mode: 'inline',
   onCommand: (ctx: ProgramContext, argv: string[]) => {
@@ -64,6 +64,19 @@ const prog: Program = {
       engine.skip();
       const c = engine.current();
       if (c) ctx.println(`music: ${c.track.title}.`);
+      return;
+    }
+    if (sub === 'prev' || sub === 'previous') {
+      if (!engine.current()) { ctx.println('music: nothing playing.'); return; }
+      engine.prev();
+      const c = engine.current();
+      if (c) ctx.println(`music: ${c.track.title}.`);
+      return;
+    }
+    if (sub === 'restart' || sub === 'rewind') {
+      if (!engine.current()) { ctx.println('music: nothing playing.'); return; }
+      engine.restart();
+      ctx.println('music: restarted.');
       return;
     }
     if (sub === 'stop') {

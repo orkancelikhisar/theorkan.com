@@ -76,6 +76,7 @@ async function main(): Promise<void> {
     panel: {
       spawn: (opts) => panels.spawn(opts),
       close: (id) => panels.close(id),
+      closeAll: () => panels.closeAll(),
       update: (id, content) => panels.update(id, content),
       focus: (id) => panels.focus(id),
     },

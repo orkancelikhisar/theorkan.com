@@ -6,18 +6,18 @@
 // so the music panel can render a real-time ASCII waveform.
 
 export interface Track {
-  name: string;            // id used by `music play <name>`
+  name: string;
   title: string;
   caption?: string;
-  duration_s: number;      // hard end; loop if you want, by replaying internally
+  duration_s: number;
   setup: (ctx: AudioContext, dest: AudioNode) => () => void;
 }
 
 export interface NowPlaying {
   track: Track;
-  startedAt: number;       // ms
-  pauseElapsed: number;    // ms accumulated while paused
-  pausedAt: number | null; // ms or null
+  startedAt: number;
+  pauseElapsed: number;
+  pausedAt: number | null;
   cleanup: () => void;
 }
 
@@ -27,12 +27,17 @@ export interface MusicAPI {
   pause(): void;
   resume(): void;
   skip(): void;
+  prev(): void;
+  restart(): void;
+  scrubBy(deltaS: number): void;
   stop(): void;
   current(): { track: Track; elapsed: number; duration: number; paused: boolean } | null;
   isPaused(): boolean;
   getAnalyser(): AnalyserNode | null;
   onChange(cb: () => void): () => void;
 }
+
+const MASTER_GAIN = 0.4;
 
 export function createMusicEngine(tracks: Track[]): MusicAPI {
   let ctx: AudioContext | null = null;
@@ -50,13 +55,24 @@ export function createMusicEngine(tracks: Track[]): MusicAPI {
         || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       ctx = new Ctx!();
       master = ctx.createGain();
-      master.gain.value = 0.4;
+      master.gain.value = MASTER_GAIN;
       analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       master.connect(analyser);
       analyser.connect(ctx.destination);
     }
+    // Browsers auto-suspend the AudioContext if it's idle or there's no recent
+    // user gesture. Try to resume on every play — if there's no gesture yet
+    // this is a no-op but the next user keystroke will land us here again.
+    if (ctx.state === 'suspended') void ctx.resume();
     return ctx;
+  }
+
+  function resetMasterGain(): void {
+    if (!ctx || !master) return;
+    // Cancel any in-flight ramp from pause/stop so the new track isn't muted.
+    master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.setValueAtTime(MASTER_GAIN, ctx.currentTime);
   }
 
   function stopNow(): void {
@@ -77,7 +93,6 @@ export function createMusicEngine(tracks: Track[]): MusicAPI {
     const list = tracks;
     let track: Track | undefined;
     if (nameOrIndex == null) {
-      // No argument — default to the first track, or skip if same one is on.
       track = list[0];
     } else if (typeof nameOrIndex === 'number') {
       track = list[((nameOrIndex % list.length) + list.length) % list.length];
@@ -88,7 +103,9 @@ export function createMusicEngine(tracks: Track[]): MusicAPI {
     if (!track) return null;
     stopNow();
     const c = ensureCtx();
-    if (c.state === 'suspended') void c.resume();
+    // Reset the master gain to default after any prior fade-to-zero so the
+    // new track is actually audible.
+    resetMasterGain();
     const cleanup = track.setup(c, master!);
     now = {
       track,
@@ -105,7 +122,7 @@ export function createMusicEngine(tracks: Track[]): MusicAPI {
   function pause(): void {
     if (!now || now.pausedAt != null) return;
     now.pausedAt = Date.now();
-    if (master) master.gain.setTargetAtTime(0, ensureCtx().currentTime, 0.05);
+    if (master && ctx) master.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
     if (endTimer != null) { clearTimeout(endTimer); endTimer = null; }
     notify();
   }
@@ -114,24 +131,53 @@ export function createMusicEngine(tracks: Track[]): MusicAPI {
     if (!now || now.pausedAt == null) return;
     now.pauseElapsed += Date.now() - now.pausedAt;
     now.pausedAt = null;
-    if (master) master.gain.setTargetAtTime(0.4, ensureCtx().currentTime, 0.05);
-    // Re-arm end timer for remaining duration.
+    if (master && ctx) {
+      master.gain.cancelScheduledValues(ctx.currentTime);
+      master.gain.setTargetAtTime(MASTER_GAIN, ctx.currentTime, 0.05);
+    }
+    if (ctx?.state === 'suspended') void ctx.resume();
     const remaining = now.track.duration_s * 1000 - elapsedMs();
     endTimer = window.setTimeout(() => skip(), Math.max(0, remaining));
     notify();
   }
 
   function skip(): void {
-    if (!now) return;
+    if (!now) { play(0); return; }
     const idx = tracks.findIndex((t) => t.name === now!.track.name);
-    const nextIdx = (idx + 1) % tracks.length;
-    play(nextIdx);
+    play((idx + 1) % tracks.length);
+  }
+
+  function prev(): void {
+    if (!now) { play(tracks.length - 1); return; }
+    const idx = tracks.findIndex((t) => t.name === now!.track.name);
+    play((idx - 1 + tracks.length) % tracks.length);
+  }
+
+  function restart(): void {
+    if (!now) return;
+    play(now.track.name);
+  }
+
+  // Shift the displayed elapsed time by `deltaS` seconds. Used to implement
+  // tape-style scrubbing — the audio keeps playing (procedural tracks can't
+  // be re-seek'd) but the progress display moves. If we land past the end
+  // we transition to the next track; if before the start we restart.
+  function scrubBy(deltaS: number): void {
+    if (!now || now.pausedAt != null) return;
+    now.startedAt -= deltaS * 1000;
+    const e = elapsedMs();
+    if (e >= now.track.duration_s * 1000) { skip(); return; }
+    if (e < 0) { restart(); return; }
+    if (endTimer != null) { clearTimeout(endTimer); endTimer = null; }
+    const remaining = now.track.duration_s * 1000 - e;
+    endTimer = window.setTimeout(() => skip(), Math.max(0, remaining));
   }
 
   function stop(): void {
     if (master && ctx) master.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
-    stopNow();
-    if (master && ctx) master.gain.setTargetAtTime(0.4, ctx.currentTime, 0.1);
+    // Defer the actual stopNow so the fade has time to finish before we
+    // disconnect oscillators (otherwise we'd hear a click).
+    window.setTimeout(stopNow, 120);
   }
 
   return {
@@ -140,6 +186,9 @@ export function createMusicEngine(tracks: Track[]): MusicAPI {
     pause,
     resume,
     skip,
+    prev,
+    restart,
+    scrubBy,
     stop,
     current() {
       if (!now) return null;

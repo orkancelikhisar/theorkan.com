@@ -26,6 +26,14 @@ playwright-report/
 test-results/
 .playwright-mcp/
 
+# gallery video source material — heavy, kept locally. Generated ASCII JSON
+# in src/content/works/ is what ships.
+videos/*.mp4
+videos/*.mov
+videos/*.webm
+videos/*.m4v
+.video-build/
+
 # claude / superpowers scratch
 .superpowers/
 .claude/

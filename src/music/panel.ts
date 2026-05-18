@@ -1,8 +1,10 @@
 import type { MusicAPI } from './engine';
 
-// Music panel — a small floating element bottom-right of the void. Renders
-// title, ASCII waveform from the AnalyserNode, and a progress bar. Updates
-// itself via rAF; closes when stop is called.
+// Music panel — small floating window bottom-right. Title + caption + live
+// AnalyserNode waveform + progress bar. Below it: three buttons —
+//   ◀◀  scrub back  (hold)
+//   ▶▶  scrub forward (hold)
+//   ×   stop + close
 
 export interface MusicPanelAPI {
   open(): void;
@@ -10,8 +12,10 @@ export interface MusicPanelAPI {
   isOpen(): boolean;
 }
 
-const WAVEFORM_W = 40;
-const WAVEFORM_H = 5;
+const WAVE_W = 40;
+const WAVE_H = 5;
+const SCRUB_STEP_S = 2;          // seconds per tick when holding
+const SCRUB_TICK_MS = 80;        // tick interval while held
 
 function fmtTime(s: number): string {
   if (!isFinite(s) || s < 0) s = 0;
@@ -21,16 +25,14 @@ function fmtTime(s: number): string {
 }
 
 function renderWaveform(analyser: AnalyserNode | null): string {
-  if (!analyser) {
-    return new Array(WAVEFORM_H).fill(' '.repeat(WAVEFORM_W)).join('\n');
-  }
+  const rows: string[][] = Array.from({ length: WAVE_H }, () => new Array(WAVE_W).fill(' '));
+  if (!analyser) return rows.map((r) => r.join('')).join('\n');
   const bufLen = analyser.fftSize;
   const data = new Uint8Array(bufLen);
   analyser.getByteTimeDomainData(data);
-  // Reduce to W columns by averaging slices.
-  const step = bufLen / WAVEFORM_W;
+  const step = bufLen / WAVE_W;
   const cols: number[] = [];
-  for (let c = 0; c < WAVEFORM_W; c++) {
+  for (let c = 0; c < WAVE_W; c++) {
     const start = Math.floor(c * step);
     const end = Math.floor((c + 1) * step);
     let max = 0;
@@ -38,19 +40,17 @@ function renderWaveform(analyser: AnalyserNode | null): string {
       const v = Math.abs(data[i] - 128);
       if (v > max) max = v;
     }
-    cols.push(max);                  // 0..127
+    cols.push(max);
   }
   const peak = Math.max(...cols, 1);
   const norm = cols.map((v) => v / peak);
-  // Render as vertical bars, centered.
-  const rows: string[][] = Array.from({ length: WAVEFORM_H }, () => new Array(WAVEFORM_W).fill(' '));
-  for (let c = 0; c < WAVEFORM_W; c++) {
-    const h = Math.max(1, Math.round(norm[c] * (WAVEFORM_H - 1)));
+  for (let c = 0; c < WAVE_W; c++) {
+    const h = Math.max(1, Math.round(norm[c] * (WAVE_H - 1)));
     const halfDown = Math.floor(h / 2);
-    const mid = Math.floor(WAVEFORM_H / 2);
+    const mid = Math.floor(WAVE_H / 2);
     for (let dy = -halfDown; dy <= h - halfDown - 1; dy++) {
       const r = mid + dy;
-      if (r < 0 || r >= WAVEFORM_H) continue;
+      if (r < 0 || r >= WAVE_H) continue;
       rows[r][c] = dy === 0 ? '─' : (dy === -halfDown || dy === h - halfDown - 1 ? '·' : '|');
     }
   }
@@ -67,8 +67,24 @@ export function createMusicPanel(music: MusicAPI, container: HTMLElement): Music
   const el = document.createElement('div');
   el.className = 'music-panel';
 
+  const head = document.createElement('div');
+  head.className = 'music-panel__head';
+
   const titleEl = document.createElement('span');
   titleEl.className = 'music-panel__title';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'music-panel__close';
+  closeBtn.type = 'button';
+  closeBtn.setAttribute('aria-label', 'stop music and close');
+  closeBtn.textContent = '×';
+  closeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    music.stop();
+    api.close();
+  });
+
+  head.append(titleEl, closeBtn);
 
   const captionEl = document.createElement('span');
   captionEl.className = 'music-panel__caption';
@@ -79,11 +95,40 @@ export function createMusicPanel(music: MusicAPI, container: HTMLElement): Music
   const progressEl = document.createElement('span');
   progressEl.className = 'music-panel__progress';
 
-  const ctrlEl = document.createElement('span');
-  ctrlEl.className = 'music-panel__ctrl';
-  ctrlEl.textContent = 'music pause / skip / stop';
+  const ctrlRow = document.createElement('div');
+  ctrlRow.className = 'music-panel__ctrl-row';
 
-  el.append(titleEl, captionEl, waveEl, progressEl, ctrlEl);
+  // Hold-to-scrub: while the pointer is held, tick scrub at SCRUB_TICK_MS.
+  function makeScrubBtn(label: string, ariaLabel: string, deltaS: number): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'music-panel__btn';
+    b.textContent = label;
+    b.setAttribute('aria-label', ariaLabel);
+    let timer: number | null = null;
+    function start(e: Event): void {
+      e.preventDefault();
+      e.stopPropagation();
+      music.scrubBy(deltaS);
+      timer = window.setInterval(() => music.scrubBy(deltaS), SCRUB_TICK_MS);
+    }
+    function stop(): void {
+      if (timer != null) { clearInterval(timer); timer = null; }
+    }
+    b.addEventListener('mousedown', start);
+    b.addEventListener('mouseup', stop);
+    b.addEventListener('mouseleave', stop);
+    b.addEventListener('touchstart', start, { passive: false });
+    b.addEventListener('touchend', stop);
+    b.addEventListener('touchcancel', stop);
+    return b;
+  }
+
+  const btnRewind  = makeScrubBtn('◀◀', 'rewind (hold)', -SCRUB_STEP_S);
+  const btnForward = makeScrubBtn('▶▶', 'fast-forward (hold)', SCRUB_STEP_S);
+  ctrlRow.append(btnRewind, btnForward);
+
+  el.append(head, captionEl, waveEl, progressEl, ctrlRow);
   container.appendChild(el);
 
   let open = false;
@@ -107,7 +152,7 @@ export function createMusicPanel(music: MusicAPI, container: HTMLElement): Music
     rafId = requestAnimationFrame(tick);
   }
 
-  return {
+  const api: MusicPanelAPI = {
     open() {
       if (open) return;
       open = true;
@@ -121,4 +166,5 @@ export function createMusicPanel(music: MusicAPI, container: HTMLElement): Music
     },
     isOpen: () => open,
   };
+  return api;
 }
