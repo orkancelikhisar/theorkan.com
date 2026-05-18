@@ -39,7 +39,7 @@ export const SNAPSHOT: FSSnapshot = dir({
           'README.txt': file('Launched baldyapp.com on iOS.'),
         }),
         regatta: dir({
-          'README.txt': file('Arkas Aegean Link Regatta — 3rd place skipper.\nIzmir, Turkey. July 2024. 5-day race.'),
+          'README.txt': file('sailor, captain, skipper.'),
           log_day_03: file('day three. wind from the north. drifting.\nthe crew is tired but in good spirits.'),
           'wind.txt': file('NNW 4kt, building to 6 by afternoon.'),
         }),

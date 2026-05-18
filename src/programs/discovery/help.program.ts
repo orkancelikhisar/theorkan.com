@@ -17,7 +17,7 @@ const prog: Program = {
     '             date   uname   uptime   weather   tree   which   whatis   say',
     'DEVICES      cat /dev/heart   /dev/wind   /dev/harbor   /dev/salt   /dev/regret',
     '             eyes   (open the camera; `eyes off` to close)',
-    'DISCOVERY    hints   secrets   motd   man <topic>   man -k threads   bbs',
+    'DISCOVERY    hints   secrets   motd   man <topic>   man -k threads   bbs   demo',
     'SHELL        ls   cd   cat   echo   find   grep   touch   rm   mv   cp',
     '             clear   history   alias   reset   vibe   mute   unmute',
     '',

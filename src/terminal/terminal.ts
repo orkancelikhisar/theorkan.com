@@ -23,6 +23,7 @@ export function createTerminal(root: HTMLElement): TerminalAPI {
   root.appendChild(term);
 
   const lines = document.createElement('div');
+  lines.className = 'terminal__lines';
   term.appendChild(lines);
 
   const promptLine = document.createElement('div');

@@ -2,7 +2,7 @@
   position: fixed;
   bottom: 24px;
   right: 24px;
-  width: 320px;
+  width: 340px;
   z-index: 40;
   background: var(--void);
   border: 1px solid var(--bone-faint);
@@ -11,7 +11,7 @@
   font-size: 11px;
   line-height: 1.4;
   color: var(--bone);
-  pointer-events: none;
+  pointer-events: auto;        /* receive clicks for buttons */
   opacity: 0;
   transform: translateY(4px);
   transition: opacity 240ms ease, transform 240ms ease;
@@ -22,13 +22,35 @@
   transform: translateY(0);
 }
 
+.music-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
 .music-panel__title {
-  display: block;
   font-size: 12px;
   letter-spacing: 0.5px;
   color: var(--bone);
-  margin-bottom: 2px;
 }
+
+.music-panel__close {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--bone-dim);
+  background: var(--void);
+  border: 1px solid var(--bone-faint);
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.music-panel__close:hover { color: var(--bone); border-color: var(--bone-dim); }
 
 .music-panel__caption {
   display: block;
@@ -51,13 +73,26 @@
 .music-panel__progress {
   display: block;
   color: var(--bone-dim);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   letter-spacing: 0;
 }
 
-.music-panel__ctrl {
-  display: block;
-  font-size: 10px;
-  color: var(--bone-faint);
-  letter-spacing: 0.5px;
+.music-panel__ctrl-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
 }
+
+.music-panel__btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--bone-dim);
+  background: var(--void);
+  border: 1px solid var(--bone-faint);
+  padding: 4px 12px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  user-select: none;
+}
+.music-panel__btn:hover { color: var(--bone); border-color: var(--bone-dim); }
+.music-panel__btn:active { color: var(--bone); border-color: var(--bone); }
