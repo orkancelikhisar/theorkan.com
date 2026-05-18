@@ -21,7 +21,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>theorkan.com</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>theorkan</title>
     <meta name="description" content="theorkan.com — a small operating system." />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,6 +30,12 @@
   </head>
   <body>
     <div id="root"></div>
+    <div id="mobile-gate" aria-hidden="true">
+      <div class="mobile-gate__inner">
+        <div class="mobile-gate__title">theorkan.com</div>
+        <div class="mobile-gate__msg">please visit on a pc or mac.</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

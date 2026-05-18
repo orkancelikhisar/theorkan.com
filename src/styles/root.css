@@ -42,3 +42,41 @@ html, body {
 }
 
 ::selection { background: var(--bone); color: var(--void); }
+
+/* Mobile / touch gate.
+   The OS is keyboard-driven, so on touch-primary devices we hide it and
+   show a one-line note instead. (hover: none) + (pointer: coarse)
+   matches phones and tablets without mis-firing on narrow desktop windows. */
+#mobile-gate {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: var(--void);
+  color: var(--bone);
+  font-family: var(--font-mono);
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  z-index: 9999;
+}
+.mobile-gate__inner {
+  text-align: center;
+  max-width: 380px;
+}
+.mobile-gate__title {
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: var(--bone-dim);
+  margin-bottom: 24px;
+}
+.mobile-gate__msg {
+  font-size: 16px;
+  color: var(--bone);
+  letter-spacing: 0.5px;
+  line-height: 1.6;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  #root, .void, .haunting { display: none !important; }
+  #mobile-gate { display: flex; }
+}
