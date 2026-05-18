@@ -1,0 +1,38 @@
+/* Haunting layer — phrases that drift in at the margins of the viewport,
+   stay for a beat, then fade. Strictly decorative; never interactive. */
+
+.haunting {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;             /* above void, below modal overlays */
+  overflow: hidden;
+}
+
+.haunting__phrase {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--bone);
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 3500ms ease-in-out;
+  text-shadow: 0 0 1px rgba(232, 230, 223, 0.05);
+}
+
+.haunting__phrase.visible {
+  opacity: 0.18;
+}
+
+/* Side variants. Left/right phrases rotate 90° so they read along the
+   margin without intruding on the terminal column. */
+.haunting__phrase--left {
+  transform: rotate(-90deg);
+  transform-origin: left top;
+}
+
+.haunting__phrase--right {
+  transform: rotate(90deg);
+  transform-origin: right top;
+}

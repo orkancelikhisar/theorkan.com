@@ -2,18 +2,18 @@ import type { Program, ProgramContext } from '../../kernel/program';
 import { getRegistry } from '../../kernel/registry';
 
 // demo — a montage that rips through the OS at speed, then erases itself so
-// the visitor is left exactly where they started. The "clear" is precise:
-// before running we snapshot how many lines are in the terminal scrollback,
-// after running we delete only the lines added during the demo.
+// the visitor is left exactly where they started. Before running we snapshot
+// how many lines are in the terminal scrollback; after running we delete
+// only the lines added during the demo.
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-// Tight cadence — fast enough to feel like a sizzle reel, slow enough that
-// you can read a word if you focus.
-const TEXT_GAP_MS = 35;
-const MODAL_HOLD_MS = 280;
-const PANEL_HOLD_MS = 320;
-const MUSIC_HOLD_MS = 700;
+// Cadence — fast enough to feel like a sizzle reel, slow enough that you
+// can read a word if you focus.
+const TEXT_GAP_MS = 28;
+const MODAL_HOLD_MS = 220;
+const PANEL_HOLD_MS = 260;
+const MUSIC_HOLD_MS = 600;
 
 function snapshotLines(): { container: HTMLElement | null; count: number } {
   const container = document.querySelector('.terminal__lines') as HTMLElement | null;
@@ -64,10 +64,27 @@ async function flashGallery(ctx: ProgramContext): Promise<void> {
   ctx.println('$ gallery');
   try { await prog.init?.(ctx); } catch { /* */ }
   for (let i = 0; i < 3; i++) {
-    await sleep(180);
+    await sleep(160);
     prog.onKey?.(ctx, {
       key: 'ArrowRight', ctrlKey: false, altKey: false, shiftKey: false, metaKey: false,
     });
+  }
+  await sleep(180);
+  try { prog.cleanup?.(ctx); } catch { /* */ }
+}
+
+async function flashWalk(ctx: ProgramContext): Promise<void> {
+  // Walk uses document-level key capture (held-key model), so we dispatch
+  // real KeyboardEvents rather than calling onKey directly.
+  const prog = getRegistry().get('walk');
+  if (!prog) return;
+  ctx.println('$ walk');
+  try { await prog.init?.(ctx); } catch { /* */ }
+  const moves = ['ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowRight', 'ArrowRight', 'ArrowRight'];
+  for (const key of moves) {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    await sleep(95);
+    document.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true }));
   }
   await sleep(200);
   try { prog.cleanup?.(ctx); } catch { /* */ }
@@ -85,46 +102,79 @@ async function runDemo(ctx: ProgramContext): Promise<void> {
   }
 }
 
-async function runDemoBody(ctx: ProgramContext): Promise<void> {
-  ctx.println('── demo ─ everything, very fast ────────────────────────────────');
+// All inline programs the visitor can type, with sensible args where needed.
+const INLINE_SEQUENCE: Array<[string, string[]]> = [
+  ['help', []],
+  ['whoami', []],
+  ['about', []],
+  ['projects', []],
+  ['contact', []],
+  ['cv', []],
+  ['man-orkan', []],
+  ['fortune', []],
+  ['cowsay', ['ineği', 'gördüm']],
+  ['figlet', ['orkan']],
+  ['say', ['salt']],
+  ['date', []],
+  ['uname', []],
+  ['uptime', []],
+  ['ps', []],
+  ['top', []],
+  ['ping', ['istanbul']],
+  ['weather', []],
+  ['motd', []],
+  ['hints', []],
+  ['secrets', []],
+  ['bbs', []],
+  ['man', ['the harbor']],
+  ['whois', ['orkan']],
+  ['whois', ['postmodern_dilenci']],
+  ['whois', ['stowaway']],
+  ['pinpoint', []],
+  ['dilenci', []],
+];
 
-  // Inline outputs — printed in rapid succession.
-  const inlineSequence: Array<[string, string[]]> = [
-    ['whoami', []],
-    ['about', []],
-    ['fortune', []],
-    ['cowsay', ['ineği', 'gördüm']],
-    ['figlet', ['orkan']],
-    ['date', []],
-    ['uname', []],
-    ['uptime', []],
-    ['ps', []],
-    ['top', []],
-    ['ping', ['istanbul']],
-    ['whois', ['orkan']],
-    ['whois', ['postmodern_dilenci']],
-    ['whois', ['stowaway']],
-    ['dilenci', []],
-  ];
-  for (const [name, args] of inlineSequence) {
+const DEVICES = ['/dev/heart', '/dev/wind', '/dev/harbor', '/dev/salt', '/dev/regret'] as const;
+
+const PANELS = ['aquarium', 'latent'];
+
+const MODAL_SCHEDULE: Array<{ name: string; hold: number } | { name: 'gallery' | 'walk' }> = [
+  { name: 'gallery' },
+  { name: 'walk' },
+  { name: 'life',    hold: MODAL_HOLD_MS },
+  { name: '2048',    hold: MODAL_HOLD_MS },
+  { name: 'snake',   hold: MODAL_HOLD_MS },
+  { name: 'regatta', hold: MODAL_HOLD_MS },
+];
+
+async function runDemoBody(ctx: ProgramContext): Promise<void> {
+  ctx.println('── demo ─ a tour of everything, very fast ─────────────────────');
+
+  // Inline outputs first — they print as a fast scroll.
+  for (const [name, args] of INLINE_SEQUENCE) {
     runInline(ctx, name, args);
     await sleep(TEXT_GAP_MS);
   }
 
   // Device reads
-  for (const dev of ['/dev/heart', '/dev/wind', '/dev/harbor', '/dev/salt'] as const) {
+  for (const dev of DEVICES) {
     ctx.println(`$ cat ${dev}`);
     try { ctx.println(ctx.fs.read(dev)); } catch { /* */ }
     await sleep(TEXT_GAP_MS);
   }
 
-  // Visuals — open / hold briefly / close
-  await flashPanel(ctx, 'aquarium', PANEL_HOLD_MS);
-  await flashPanel(ctx, 'latent', PANEL_HOLD_MS);
-  await flashPanel(ctx, 'currency', PANEL_HOLD_MS);
-  await flashGallery(ctx);
-  await flashModal(ctx, 'life', MODAL_HOLD_MS);
-  await flashModal(ctx, '2048', MODAL_HOLD_MS);
+  // Panel-mode visuals: aquarium, latent
+  for (const name of PANELS) {
+    await flashPanel(ctx, name, PANEL_HOLD_MS);
+  }
+
+  // Modal visuals: gallery (with arrow navigation), walk (with movement),
+  // then the games.
+  for (const item of MODAL_SCHEDULE) {
+    if (item.name === 'gallery')   await flashGallery(ctx);
+    else if (item.name === 'walk') await flashWalk(ctx);
+    else                            await flashModal(ctx, item.name, (item as { hold: number }).hold);
+  }
 
   // Music — quick taste
   ctx.println('$ music play harbor');
@@ -133,12 +183,12 @@ async function runDemoBody(ctx: ProgramContext): Promise<void> {
   await sleep(MUSIC_HOLD_MS);
   if (music?.onCommand) music.onCommand(ctx, ['music', 'stop']);
 
-  ctx.println('── demo end ───────────────────────────────────────────────────');
+  ctx.println('── demo end ──────────────────────────────────────────────────');
 }
 
 const prog: Program = {
   name: 'demo',
-  manpage: 'demo — a few-second tour. erases itself when done.',
+  manpage: 'demo — a fast tour of every app. erases itself when done.',
   category: 'discovery',
   mode: 'inline',
   onCommand: (ctx: ProgramContext) => {
