@@ -22,6 +22,7 @@ import './kernel/panels.css';
 import { requestEyesCamera } from './eyes/camera';
 import { createDilenci, type DilenciAPI } from './dilenci/dilenci';
 import { createLlmAdapter } from './dilenci/llm';
+import { createHaunting } from './haunting/haunting';
 import type { Program, ProgramContext, KeyEvent } from './kernel/program';
 
 async function main(): Promise<void> {
@@ -140,6 +141,12 @@ async function main(): Promise<void> {
     // Expose for the dilenci shell command without dragging dilenci into ctx.
     (globalThis as unknown as { __dilenci?: DilenciAPI }).__dilenci = dilenci;
   }, 2_000);
+
+  // Haunting — ambient liminal phrases at the margins. Starts a few minutes
+  // after boot; first fire is pseudo-random so two visitors never see the
+  // same phrase first.
+  const haunting = createHaunting();
+  (globalThis as unknown as { __haunt?: typeof haunting }).__haunt = haunting;
 
   // Konami fireworks
   installKonami(events);
