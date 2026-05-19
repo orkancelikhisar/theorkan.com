@@ -17,7 +17,9 @@ export function startWhisperEngine(voidApi: VoidAPI): () => void {
   let timer: number;
   function schedule(): void {
     timer = window.setTimeout(() => {
-      if (Math.random() < 0.6) {
+      // Skip when the tab is hidden — otherwise throttled timers accumulate
+      // and fire as a burst on refocus, flooding the void layer.
+      if (!document.hidden && Math.random() < 0.6) {
         const word = whispers[Math.floor(Math.random() * whispers.length)];
         voidApi.whisper(word);
       }

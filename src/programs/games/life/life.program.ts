@@ -46,6 +46,9 @@ function draw(): void {
 }
 
 function tick(): void {
+  // When the tab is hidden the browser fires throttled timer callbacks in
+  // a burst on refocus. Skip the simulation step so no work piles up.
+  if (document.hidden) return;
   state.board = lifeStep(state.board);
   state.generation += 1;
   draw();

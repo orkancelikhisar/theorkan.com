@@ -66,6 +66,7 @@ function paint(): void {
 
 function tick(): void {
   if (!active) return;
+  if (document.hidden) return;       // skip work while tab is backgrounded
   const palette = paletteForHour(new Date().getHours());
   const rng = Math.random;
   const mutations = Math.floor(W * H * MUTATION_FRACTION);

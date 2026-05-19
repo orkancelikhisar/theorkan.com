@@ -44,6 +44,7 @@ export function createVoid(events: EventBus, audio: AudioAPI): VoidAPI {
     const dy = (Math.random() - 0.5) * 0.1;
     let frames = 0;
     const id = window.setInterval(() => {
+      if (document.hidden) return;     // skip motion while tab is backgrounded
       x += dx; y += dy;
       p.style.left = `${x}%`;
       p.style.top = `${y}%`;

@@ -385,6 +385,7 @@ export function createDilenci(deps: DilenciDeps): DilenciAPI {
   }
 
   async function ghostPoemTick(): Promise<void> {
+    if (document.hidden) { scheduleNextGhost(); return; }
     if (state.get().silenced || inOfferMode) { scheduleNextGhost(); return; }
     let text: string | null = null;
     if (deps.llm?.ready()) {
@@ -432,10 +433,14 @@ export function createDilenci(deps: DilenciDeps): DilenciAPI {
   });
 
   window.setInterval(() => {
+    if (document.hidden) return;       // don't roll appearances while hidden
     lastIdleMs = Date.now() - lastActiveAt;
     if (lastIdleMs >= 90_000) rollAndMaybeAppear();
   }, IDLE_TICK_MS);
-  window.setInterval(selfWhisper, WHISPER_TICK_MS);
+  window.setInterval(() => {
+    if (document.hidden) return;
+    selfWhisper();
+  }, WHISPER_TICK_MS);
   scheduleNextGhost();
 
   void primeCache();

@@ -66,6 +66,7 @@ function draw(): void {
 
 function tick(): void {
   if (!state.alive) return;
+  if (document.hidden) return;          // skip work while tab is backgrounded
   const head = { ...state.snake[0] };
   head.x = (head.x + state.dir.x + W) % W;
   head.y = (head.y + state.dir.y + H) % H;
