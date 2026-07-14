@@ -4,6 +4,7 @@ import warnLines from '../content/boot-warn.json';
 import curiosityLines from '../content/boot-curiosity.json';
 import dilenciLines from '../content/boot-dilenci.json';
 import type { AudioAPI } from '../audio/audio';
+import { coastalSnapshot, readCoastalMemory } from '../coast/coastal-memory';
 
 const VISIT_KEY = 'theorkan.boot.lastVisit';
 const SESSION_COUNT = 'theorkan.boot.sessions';
@@ -45,6 +46,7 @@ export function buildBootScript(): BootLine[] {
   const lines: BootLine[] = [];
   const lastSeen = lastSeenPhrase();
   const hasLedger = readLedgerHas();
+  const coast = coastalSnapshot(readCoastalMemory());
 
   lines.push({ kind: 'plain', text: `theOrkan.OS v0.1.0 — booted ${now()}` });
   if (lastSeen) {
@@ -61,6 +63,8 @@ export function buildBootScript(): BootLine[] {
   lines.push({ kind: 'ok', text: '[ OK ] mounting /var/regret      62 entries' });
   lines.push({ kind: 'ok', text: '[ OK ] mounting /dev             heart, wind, harbor, salt, regret, tide' });
   lines.push({ kind: 'ok', text: '[ OK ] mounting /usr/share/poems 23 fragments' });
+  lines.push({ kind: 'ok', text: `[ OK ] mounting coastal memory   ${coast.memory.phrases.length} phrases / ${coast.memory.artifacts.length} objects` });
+  lines.push({ kind: 'ok', text: `[ OK ] weather bus               ${coast.weather}, tide ${coast.tideName}` });
   lines.push({ kind: 'ok', text: '[ OK ] driver: keyboard' });
   lines.push({ kind: 'ok', text: '[ OK ] driver: void              drift, whisper, shine' });
   lines.push({ kind: 'ok', text: '[ OK ] driver: ascii             release 1979' });
@@ -73,6 +77,9 @@ export function buildBootScript(): BootLine[] {
     lines.push({ kind: 'defer', text: `[ .. ] locating postmodern_dilenci ............... ${pick(dilenciLines)}` });
   } else {
     lines.push({ kind: 'defer', text: '[ .. ] locating postmodern_dilenci ............... deferred (he sleeps)' });
+  }
+  if (coast.memory.departedAt) {
+    lines.push({ kind: 'curious', text: '[ ?? ] the boat left. the harbor booted anyway.' });
   }
 
   lines.push({ kind: 'ok', text: '[ OK ] init: void daemon         drift enabled' });

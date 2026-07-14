@@ -3,11 +3,18 @@ import type { Program, ProgramContext } from '../../kernel/program';
 import { createMusicEngine, type MusicAPI } from '../../music/engine';
 import { createMusicPanel, type MusicPanelAPI } from '../../music/panel';
 import { TRACKS } from '../../music/tracks';
+import { recordCoastalFrequency } from '../../coast/coastal-memory';
 
 // Lazy module-level singletons so all `music` invocations share state across
 // the session. The engine creates the AudioContext on first play.
 let engine: MusicAPI | null = null;
 let panel: MusicPanelAPI | null = null;
+
+function trackFrequency(name: string): string {
+  let hash = 0;
+  for (const char of name) hash = (Math.imul(hash, 31) + char.charCodeAt(0)) >>> 0;
+  return `${(87.5 + (hash % 160) / 10).toFixed(1)} MHz / lower sideband`;
+}
 
 function ensure(): { engine: MusicAPI; panel: MusicPanelAPI } {
   if (!engine) engine = createMusicEngine(TRACKS);
@@ -44,7 +51,10 @@ const prog: Program = {
       const track = engine.play(name);
       if (!track) { ctx.println(`music: no track "${name ?? ''}". try \`music ls\`.`); return; }
       panel.open();
+      const frequency = trackFrequency(track.name);
+      recordCoastalFrequency(frequency);
       ctx.println(`music: ${track.title}.`);
+      ctx.println(`radio: ${frequency}.`);
       return;
     }
     if (sub === 'pause') {

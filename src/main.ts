@@ -24,10 +24,13 @@ import { createDilenci, type DilenciAPI } from './dilenci/dilenci';
 import { createLlmAdapter } from './dilenci/llm';
 import { createHaunting } from './haunting/haunting';
 import type { Program, ProgramContext, KeyEvent } from './kernel/program';
+import { createCoastalAtmosphere } from './coast/coastal-atmosphere';
+import { beginCoastalSession, recordCoastalCommand } from './coast/coastal-memory';
 
 async function main(): Promise<void> {
   installConsoleBanner();
   installInterceptors();
+  beginCoastalSession();
 
   sessionStorage.setItem('theorkan.session.start', String(Date.now()));
 
@@ -48,6 +51,7 @@ async function main(): Promise<void> {
 
   // Terminal
   const terminal = createTerminal(root);
+  createCoastalAtmosphere(events, terminal, document.body);
 
   // Void layer
   const voidApi = createVoid(events, audio);
@@ -232,6 +236,7 @@ async function main(): Promise<void> {
     }
 
     events.emit('shell:command', { line });
+    recordCoastalCommand(line);
     await shell.run(line);
     refreshPrompt();
     events.emit('shell:active', null);

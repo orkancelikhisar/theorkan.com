@@ -1,4 +1,5 @@
 import type { Program } from '../../kernel/program';
+import { coastalSnapshot } from '../../coast/coastal-memory';
 
 function moodForDate(): string {
   const m = new Date().getMonth();
@@ -15,10 +16,12 @@ const prog: Program = {
   mode: 'inline',
   onCommand: () => {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const coast = coastalSnapshot();
     return [
       `i don't know where you are. i can guess: ${tz}.`,
       `today: ${moodForDate()}.`,
-      'try `cat /dev/wind` for theOrkan weather.',
+      `inside: ${coast.weather}, tide ${coast.tideName}, wind ${coast.windSpeed}kt.`,
+      'the same weather is touching the harbor, the words, and the terminal.',
     ].join('\n');
   },
 };

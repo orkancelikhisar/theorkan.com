@@ -1,5 +1,6 @@
 import type { DeviceModule } from '../../kernel/devices';
 import { lunarTide, moonName } from '../art/undertow/tide';
+import { coastalSnapshot } from '../../coast/coastal-memory';
 
 function rememberedLines(): number {
   try {
@@ -16,10 +17,11 @@ const dev: DeviceModule = {
     const moon = moonName(tide.phase);
     const light = Math.round(tide.illumination * 100);
     const lines = rememberedLines();
+    const coast = coastalSnapshot();
     const memory = lines === 0
       ? 'nothing given to the water yet.'
       : `${lines} sentence${lines === 1 ? '' : 's'} moving below instrument range.`;
-    return `${moon} moon, ${light}% lit. tide ${tide.direction}.\n${memory}\nsee: \`undertow\`.`;
+    return `${moon} moon, ${light}% lit. tide ${coast.tideName} at ${Math.round(coast.tide * 100)}%.\n${memory}\nsee: \`undertow\`.`;
   },
 };
 

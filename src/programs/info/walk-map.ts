@@ -1,49 +1,8 @@
-// Geography. ONE static map; the player walks across it. Buildings are
-// walkable rooms; their interiors define the zone (kitchen / studio / etc.).
-// Crossover tiles inside specific buildings dispatch other programs.
-//
-// The map is sized to fit the modal on a single screen — no scrolling
-// viewport. We render the whole grid every frame.
-
 import { PLACES } from './walk-places';
+import { ROOM_DECORATIONS } from './walk-decorations';
 
-export const OW_W = 78;
-export const OW_H = 26;
-
-// ── tile semantics ────────────────────────────────────────────────────────
-
-const WALKABLE = new Set<string>([
-  ' ',                              // open ground
-  '═', '╩', '|',                    // pier, gangplank junction, gangplank
-  'B',                              // boat deck
-  'D',                              // doorway (just a labelled walkable tile now)
-  'S', 'F',                         // shore, field
-  'G', 'M', 'd', 'C', 'U',          // crossover trigger tiles
-]);
-
-export function isWalkable(ch: string): boolean {
-  return WALKABLE.has(ch);
-}
-
-// Tile intensity tier — for per-cell CSS styling. doryen-style: brighter
-// = more important / closer to foreground; faint = background ambience.
-export type Tier = 'bright' | 'normal' | 'dim' | 'faint' | 'water';
-export function tierOf(ch: string): Tier {
-  if (ch === '~') return 'water';
-  if (ch === '^' || ch === '/' || ch === '\\' || ch === '_') return 'dim';     // boat decoration
-  if (ch === 'B') return 'bright';
-  if (ch === '|' || ch === '╩') return 'normal';
-  if (ch === '═') return 'dim';
-  if (ch === ' ') return 'faint';
-  if (ch === 'S' || ch === 'F') return 'dim';
-  if (ch === 'D') return 'bright';
-  if (ch === 'G' || ch === 'M' || ch === 'd' || ch === 'C' || ch === 'U') return 'bright';
-  // box drawing chars (building walls)
-  if ('┌─┐│└─┘├┤┬┴┼'.includes(ch)) return 'normal';
-  // letters of building labels embedded in walls
-  if (/[A-Z]/.test(ch)) return 'normal';
-  return 'normal';
-}
+export const OW_W = 64;
+export const OW_H = 44;
 
 export interface Pos { col: number; row: number; }
 
@@ -53,163 +12,225 @@ export interface CrossoverTile {
   argv?: string[];
 }
 
-// ── map construction ──────────────────────────────────────────────────────
+export type TileKind =
+  | 'water' | 'grass' | 'path' | 'shore' | 'salt'
+  | 'pier' | 'boat' | 'floor' | 'wall' | 'door'
+  | 'tree' | 'rock' | 'portal' | 'decor';
 
-function blank(w: number, h: number, fill = ' '): string[][] {
-  return Array.from({ length: h }, () => Array<string>(w).fill(fill));
+export interface BuildingSpec {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  accent: 'warm' | 'cool' | 'rust' | 'void';
 }
 
-function stamp(g: string[][], x: number, y: number, art: string[]): void {
-  for (let dy = 0; dy < art.length; dy++) {
-    for (let dx = 0; dx < art[dy].length; dx++) {
-      const row = g[y + dy];
-      if (!row) continue;
-      if (x + dx < 0 || x + dx >= row.length) continue;
-      row[x + dx] = art[dy][dx];
+export const BOAT_SPEC = {
+  left: 10,
+  right: 14,
+  top: 2,
+  bottom: 5,
+  mastCol: 12.5,
+  mastRow: 4.15,
+} as const;
+
+const WALKABLE = new Set(['.', ':', 's', 'f', 'l', '=', 'b', 'i', '+', 'G', 'M', 'd', 'C', 'U', 'I']);
+
+export function isWalkable(ch: string): boolean {
+  return WALKABLE.has(ch);
+}
+
+export function tileKindOf(ch: string): TileKind {
+  if (ch === '~') return 'water';
+  if (ch === '.') return 'grass';
+  if (ch === ':') return 'path';
+  if (ch === 's' || ch === 'l') return 'shore';
+  if (ch === 'f') return 'salt';
+  if (ch === '=') return 'pier';
+  if (ch === 'b') return 'boat';
+  if (ch === 'i') return 'floor';
+  if (ch === 'x') return 'decor';
+  if (ch === '#') return 'wall';
+  if (ch === '+') return 'door';
+  if (ch === 'T') return 'tree';
+  if (ch === 'R') return 'rock';
+  if ('GMdCUIH'.includes(ch)) return 'portal';
+  return 'grass';
+}
+
+// Kept for shell integrations that still inspect the old intensity model.
+export type Tier = 'bright' | 'normal' | 'dim' | 'faint' | 'water';
+export function tierOf(ch: string): Tier {
+  const kind = tileKindOf(ch);
+  if (kind === 'water') return 'water';
+  if (kind === 'portal' || kind === 'door' || kind === 'boat') return 'bright';
+  if (kind === 'wall' || kind === 'pier' || kind === 'tree') return 'normal';
+  if (kind === 'path' || kind === 'shore' || kind === 'rock') return 'dim';
+  return 'faint';
+}
+
+function blank(): string[][] {
+  return Array.from({ length: OW_H }, () => Array<string>(OW_W).fill('.'));
+}
+
+function fillRect(grid: string[][], x: number, y: number, w: number, h: number, tile: string): void {
+  for (let row = y; row < y + h; row++) {
+    for (let col = x; col < x + w; col++) {
+      if (row >= 0 && row < OW_H && col >= 0 && col < OW_W) grid[row][col] = tile;
     }
   }
 }
 
-// Build a building with an embedded label in the top wall, walkable
-// interior, and a doorway at the middle of the bottom wall.
-function buildBuilding(g: string[][], x: number, y: number, w: number, h: number, label: string): void {
-  const innerW = w - 2;
-  const labelLen = label.length;
-  const leftDashes = Math.floor((innerW - labelLen) / 2);
-  const rightDashes = innerW - labelLen - leftDashes;
-  const top = '┌' + '─'.repeat(leftDashes) + label + '─'.repeat(rightDashes) + '┐';
-  stamp(g, x, y, [top]);
-  for (let i = 1; i < h - 1; i++) {
-    stamp(g, x, y + i, ['│']);
-    stamp(g, x + w - 1, y + i, ['│']);
-  }
-  // Bottom wall, with D in the middle
-  const doorAt = Math.floor(w / 2);
-  const bottomChars: string[] = ['└'];
-  for (let cx = 1; cx < w - 1; cx++) {
-    bottomChars.push(cx === doorAt ? 'D' : '─');
-  }
-  bottomChars.push('┘');
-  stamp(g, x, y + h - 1, [bottomChars.join('')]);
+function pathH(grid: string[][], x1: number, x2: number, row: number, thickness = 2): void {
+  fillRect(grid, Math.min(x1, x2), row, Math.abs(x2 - x1) + 1, thickness, ':');
 }
 
-interface BuildingSpec { id: string; x: number; y: number; w: number; h: number; label: string; }
+function pathV(grid: string[][], col: number, y1: number, y2: number, thickness = 2): void {
+  fillRect(grid, col, Math.min(y1, y2), thickness, Math.abs(y2 - y1) + 1, ':');
+}
 
-const BUILDINGS: BuildingSpec[] = [
-  { id: 'kitchen', x: 8,  y: 8,  w: 13, h: 5, label: 'KITCHEN' },
-  { id: 'window',  x: 24, y: 8,  w: 13, h: 5, label: 'WINDOW'  },
-  { id: 'studio',  x: 8,  y: 14, w: 13, h: 5, label: 'STUDIO'  },
-  { id: 'alley',   x: 24, y: 14, w: 13, h: 5, label: 'ALLEY'   },
-  { id: 'radio',   x: 8,  y: 20, w: 13, h: 5, label: 'RADIO'   },
-  { id: 'empty',   x: 24, y: 20, w: 13, h: 5, label: 'EMPTY'   },
+export const BUILDINGS: BuildingSpec[] = [
+  { id: 'kitchen', x: 16, y: 13, w: 10, h: 8, accent: 'warm' },
+  { id: 'window',  x: 30, y: 12, w: 10, h: 8, accent: 'cool' },
+  { id: 'studio',  x: 45, y: 13, w: 11, h: 8, accent: 'warm' },
+  { id: 'alley',   x: 17, y: 27, w: 10, h: 8, accent: 'void' },
+  { id: 'radio',   x: 32, y: 27, w: 11, h: 8, accent: 'rust' },
+  { id: 'empty',   x: 48, y: 26, w: 10, h: 9, accent: 'void' },
 ];
 
+export const LOW_TIDE_TILES: Pos[] = [
+  { col: 1, row: 17 }, { col: 3, row: 17 },
+  { col: 1, row: 18 }, { col: 2, row: 18 }, { col: 3, row: 18 },
+  { col: 1, row: 19 }, { col: 2, row: 19 }, { col: 3, row: 19 },
+  { col: 4, row: 18 }, { col: 5, row: 18 }, { col: 6, row: 18 },
+  { col: 7, row: 18 }, { col: 8, row: 18 },
+];
+
+function buildRoom(grid: string[][], building: BuildingSpec): void {
+  fillRect(grid, building.x, building.y, building.w, building.h, '#');
+  fillRect(grid, building.x + 1, building.y + 1, building.w - 2, building.h - 2, 'i');
+  const doorCol = building.x + Math.floor(building.w / 2);
+  grid[building.y + building.h - 1][doorCol] = '+';
+  // A small threshold outside each building makes entrances legible.
+  if (building.y + building.h < OW_H) grid[building.y + building.h][doorCol] = ':';
+}
+
+function deterministicScatter(grid: string[][]): void {
+  for (let row = 10; row < OW_H - 2; row++) {
+    for (let col = 10; col < OW_W - 2; col++) {
+      if (grid[row][col] !== '.') continue;
+      const n = (col * 73 + row * 151 + col * row * 17) % 211;
+      if (n === 7 || n === 31) grid[row][col] = 'T';
+      else if (n === 83) grid[row][col] = 'R';
+    }
+  }
+}
+
 function buildOverworld(): { grid: string[][]; crossovers: CrossoverTile[] } {
-  const g = blank(OW_W, OW_H, ' ');
+  const grid = blank();
 
-  // Water rows 0-4
-  for (let r = 0; r <= 4; r++) for (let c = 0; c < OW_W; c++) g[r][c] = '~';
+  // Northern sea and a curved western coastline.
+  fillRect(grid, 0, 0, OW_W, 8, '~');
+  for (let row = 8; row < OW_H; row++) {
+    const coast = 7 + Math.round(Math.sin(row * 0.37) * 1.5) + (row > 31 ? Math.floor((row - 31) / 4) : 0);
+    for (let col = 0; col < coast; col++) grid[row][col] = '~';
+    for (let col = coast; col < Math.min(OW_W, coast + 3); col++) grid[row][col] = 's';
+  }
+  for (const tile of LOW_TIDE_TILES) grid[tile.row][tile.col] = 'l';
+  grid[17][2] = 'H';
 
-  // Boat: sail tip + mast + hull + gangplank at col 38
-  stamp(g, 38, 1, ['^']);
-  stamp(g, 37, 2, ['/|\\']);
-  stamp(g, 36, 3, ['/_B_\\']);
-  stamp(g, 38, 4, ['|']);
+  // A north-facing boat: pointed bow, broad walkable deck, narrow gangway.
+  grid[2][12] = 'b';
+  fillRect(grid, 11, 3, 3, 1, 'b');
+  fillRect(grid, 10, 4, 5, 2, 'b');
+  fillRect(grid, 13, 6, 12, 3, '=');
+  fillRect(grid, 22, 8, 3, 4, '=');
 
-  // Pier — full width with T-junction at gangplank
-  for (let c = 0; c < OW_W; c++) g[5][c] = '═';
-  g[5][38] = '╩';
+  // Village paths form a readable loop with smaller branches to each door.
+  pathH(grid, 12, 59, 10, 2);
+  pathH(grid, 12, 59, 23, 2);
+  pathH(grid, 13, 58, 37, 2);
+  pathV(grid, 12, 10, 38, 2);
+  pathV(grid, 28, 10, 38, 2);
+  pathV(grid, 43, 10, 38, 2);
+  pathV(grid, 59, 10, 38, 2);
 
-  // Buildings
-  for (const b of BUILDINGS) buildBuilding(g, b.x, b.y, b.w, b.h, b.label);
+  for (const building of BUILDINGS) buildRoom(grid, building);
 
-  // Crossover tiles: in the middle of the inside of each building
+  // Furniture occupies real collision tiles and is inspected from an
+  // adjacent tile, like objects in classic top-down adventure games.
+  for (const decoration of ROOM_DECORATIONS) {
+    fillRect(grid, decoration.x, decoration.y, decoration.w, decoration.h, 'x');
+  }
+
   const crossovers: CrossoverTile[] = [];
-  function addCross(buildingId: string, ch: string, command: string, argv?: string[]): void {
-    const b = BUILDINGS.find((x) => x.id === buildingId)!;
-    const col = b.x + Math.floor(b.w / 2);
-    const row = b.y + Math.floor(b.h / 2);
-    g[row][col] = ch;
-    crossovers.push({ at: { col, row }, command, argv });
+  const addCrossover = (id: string, tile: string, command: string, argv?: string[]): void => {
+    const building = BUILDINGS.find((item) => item.id === id);
+    if (!building) throw new Error(`walk-map: missing building ${id}`);
+    const at = {
+      col: building.x + Math.floor(building.w / 2),
+      row: building.y + 3,
+    };
+    grid[at.row][at.col] = tile;
+    crossovers.push({ at, command, argv });
+  };
+  addCrossover('studio', 'G', 'gallery');
+  addCrossover('alley', 'd', 'dilenci', ['wake']);
+  addCrossover('radio', 'M', 'music');
+  addCrossover('empty', 'C', 'whois', ['stowaway']);
+
+  // A door/window that disagrees with the dimensions of its building.
+  grid[16][33] = 'I';
+
+  // Salt field in the southeast and the wrong-way current on the western shore.
+  for (let row = 36; row < OW_H; row++) {
+    for (let col = 31; col < OW_W; col++) if (grid[row][col] === '.') grid[row][col] = 'f';
   }
-  addCross('studio', 'G', 'gallery');
-  addCross('alley',  'd', 'dilenci', ['wake']);
-  addCross('radio',  'M', 'music');
-  addCross('empty',  'C', 'whois',   ['stowaway']);
+  const undertow = { col: 9, row: 22 };
+  grid[undertow.row][undertow.col] = 'U';
+  crossovers.push({ at: undertow, command: 'undertow' });
 
-  // Shore — solid sloped band along the east edge of the harbor open area.
-  // Drawn as a filled trapezoid: every cell inside the bounds becomes 'S'.
-  for (let r = 8; r <= 18; r++) {
-    // left edge slants inward; right edge fixed
-    const left  = 40 + Math.max(0, 14 - r);
-    const right = 48 + Math.max(0, r - 12);
-    for (let c = left; c <= right && c < OW_W; c++) {
-      if (g[r][c] === ' ') g[r][c] = 'S';
-    }
-  }
-
-  // Field — solid block further east, extending south of the shore.
-  for (let r = 10; r <= 24; r++) {
-    const left  = 50 + Math.max(0, 14 - r);
-    const right = 73;
-    for (let c = left; c <= right && c < OW_W; c++) {
-      if (g[r][c] === ' ') g[r][c] = 'F';
-    }
-  }
-
-  // A current running against the visible shore. Unlike the building
-  // crossovers, this one is found in open terrain.
-  g[13][47] = 'U';
-  crossovers.push({ at: { col: 47, row: 13 }, command: 'undertow' });
-
-  return { grid: g, crossovers };
+  deterministicScatter(grid);
+  return { grid, crossovers };
 }
 
 const overworld = buildOverworld();
-export const OVERWORLD_GRID: string[] = overworld.grid.map((r) => r.join(''));
+export const OVERWORLD_GRID = overworld.grid.map((row) => row.join(''));
 export const OVERWORLD_CROSSOVERS = overworld.crossovers;
+export const START_POS: Pos = { col: 24, row: 10 };
 
-// Player start: just south of the pier, mid-screen
-export const START_POS: Pos = { col: 40, row: 7 };
-
-// ── zone resolution ───────────────────────────────────────────────────────
-
-// Each building's interior tiles map to that building's place id.
-function isInsideBuilding(b: BuildingSpec, p: Pos): boolean {
-  return p.col > b.x && p.col < b.x + b.w - 1 && p.row > b.y && p.row < b.y + b.h - 1;
+function inside(building: BuildingSpec, pos: Pos): boolean {
+  return pos.col > building.x
+    && pos.col < building.x + building.w - 1
+    && pos.row > building.y
+    && pos.row < building.y + building.h - 1;
 }
 
-// The doorway tile (D) is part of the building's bottom wall; treat
-// "standing on D" as still being in that building's zone.
-function isOnDoorway(b: BuildingSpec, p: Pos): boolean {
-  return p.row === b.y + b.h - 1 && p.col === b.x + Math.floor(b.w / 2);
+function doorway(building: BuildingSpec, pos: Pos): boolean {
+  return pos.row === building.y + building.h - 1
+    && pos.col === building.x + Math.floor(building.w / 2);
 }
 
-export function zoneAt(p: Pos): string | null {
-  const tile = OVERWORLD_GRID[p.row]?.[p.col];
-  if (!tile || tile === '~') return null;
-
-  // Building zones first
-  for (const b of BUILDINGS) {
-    if (isInsideBuilding(b, p) || isOnDoorway(b, p)) return b.id;
+export function zoneAt(pos: Pos): string | null {
+  const tile = OVERWORLD_GRID[pos.row]?.[pos.col];
+  if (!tile || !isWalkable(tile)) return null;
+  for (const building of BUILDINGS) {
+    if (inside(building, pos) || doorway(building, pos)) return building.id;
   }
-
-  // Terrain zones
-  if (tile === 'S' || tile === 'U') return 'shore';
-  if (tile === 'F') return 'field';
-  if (tile === 'B' || tile === '|') return 'boat';
-
-  // Default walkable → harbor
-  if (isWalkable(tile)) return 'harbor';
-  return null;
+  if (tile === 's' || tile === 'l' || tile === 'U') return 'shore';
+  if (tile === 'f') return 'field';
+  if (tile === 'b') return 'boat';
+  return 'harbor';
 }
 
-// Validate that every walkable tile maps to a real place.
-for (let r = 0; r < OW_H; r++) {
-  for (let c = 0; c < OW_W; c++) {
-    const ch = OVERWORLD_GRID[r][c];
-    if (!isWalkable(ch)) continue;
-    const z = zoneAt({ col: c, row: r });
-    if (z && !PLACES[z]) throw new Error(`walk-map: tile (${c},${r})='${ch}' → zone '${z}' has no PLACE`);
+for (let row = 0; row < OW_H; row++) {
+  for (let col = 0; col < OW_W; col++) {
+    const tile = OVERWORLD_GRID[row][col];
+    if (!isWalkable(tile)) continue;
+    const zone = zoneAt({ col, row });
+    if (!zone || !PLACES[zone]) {
+      throw new Error(`walk-map: walkable tile (${col},${row})='${tile}' has no place`);
+    }
   }
 }

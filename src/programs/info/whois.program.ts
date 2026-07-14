@@ -1,4 +1,5 @@
 import type { Program } from '../../kernel/program';
+import { addCoastalArtifact } from '../../coast/coastal-memory';
 
 // whois — lookup the names you keep hearing. Returns lore for the residents
 // of theOrkan.OS. Unknown names get the canonical "no one by that name."
@@ -75,6 +76,7 @@ const prog: Program = {
     if (!name) { ctx.println('whois: who.'); return; }
     const hit = lookup(name);
     if (!hit) { ctx.println(`whois: no one by that name. (${name})`); return; }
+    if (hit.aliases.includes('stowaway')) addCoastalArtifact('stowaway-name');
     for (const line of hit.body) ctx.println(line);
   },
 };

@@ -1,6 +1,7 @@
 import './undertow.css';
 import { DILENCI_EYE_HEIGHT, DILENCI_EYE_WIDTH, renderDilenciEye } from '../../../dilenci/eye';
 import dilenciFisherImageUrl from '../../../assets/undertow/dilenci-fisher-v2.png?url';
+import { addCoastalArtifact, coastalSnapshot, recordCoastalPhrase } from '../../../coast/coastal-memory';
 import type { Program, ProgramContext } from '../../../kernel/program';
 import fallbackLines from '../../../content/undertow.json';
 import {
@@ -149,6 +150,11 @@ interface UndertowState {
   retireAt: Map<number, number>;
   lastReadoutAt: number;
   lastMirrorText: string;
+  coastWindDegrees: number;
+  coastWindSpeed: number;
+  coastTide: number;
+  coastTideName: 'low' | 'rising' | 'high' | 'falling';
+  coastWeather: 'clear' | 'mist' | 'rain' | 'storm' | 'absence';
   closed: boolean;
 }
 
@@ -350,6 +356,8 @@ function releaseLine(state: UndertowState, raw: string): void {
   const line = raw.replace(/\s+/g, ' ').trim().slice(0, MAX_LINE_LENGTH);
   if (!line) return;
   persistLine(state, line);
+  recordCoastalPhrase(line, 'undertow');
+  addCoastalArtifact('undertow-line');
   const preferredLane = state.laneCursor++ % STREAM_LANES.length;
   const seed: SeedLine = { text: line, source: 'visitor', age: 0 };
   if (state.reducedMotion) {
@@ -563,6 +571,7 @@ function hookParticle(state: UndertowState, particle: Particle): void {
   const fishing = state.fishing;
   if (!attachFishingTether(state.world, particle.id, particle.x, particle.y, 0.008)) return;
   const body = state.world.bodies.find((candidate) => candidate.id === particle.bodyId);
+  if (body?.text) recordCoastalPhrase(body.text, 'dilenci', true);
   const narrate = fishing.catches === 0
     || body?.source === 'visitor'
     || /[.,;:!?—-]/.test(particle.glyph);
@@ -951,11 +960,12 @@ function drawDilenci(state: UndertowState): void {
     const bandHeight = FISHER_ART.waterY / bandCount;
     const fabricOffset = (vertical: number): { x: number; y: number } => {
       const anchor = Math.max(0, 1 - vertical) ** 1.35;
+      const sharedWind = Math.sin(state.coastWindDegrees * Math.PI / 180) * state.coastWindSpeed * anchor * 0.18;
       return {
         x: (
           Math.sin(state.world.time * 0.78 + vertical * 5.7)
           + Math.sin(state.world.time * 0.31 + vertical * 11.3) * 0.38
-        ) * (1.1 + anchor * 3.4) * living,
+        ) * (1.1 + anchor * 3.4) * living + sharedWind * living,
         y: Math.sin(state.world.time * 0.54 + vertical * 7.1 + 0.8) * anchor * 1.45 * living,
       };
     };
@@ -1446,7 +1456,13 @@ function updateReadout(state: UndertowState, now: number): void {
   if (now - state.lastReadoutAt < 750) return;
   state.lastReadoutAt = now;
   const tide = lunarTide();
-  state.readout.textContent = `${moonName(tide.phase)} moon · ${Math.round(tide.illumination * 100)}%\ntide ${tide.direction}`;
+  const coast = coastalSnapshot();
+  state.coastWindDegrees = coast.windDegrees;
+  state.coastWindSpeed = coast.windSpeed;
+  state.coastTide = coast.tide;
+  state.coastTideName = coast.tideName;
+  state.coastWeather = coast.weather;
+  state.readout.textContent = `${moonName(tide.phase)} moon · ${Math.round(tide.illumination * 100)}%\ntide ${coast.tideName} · ${coast.weather}`;
   const sentences = state.world.bodies
     .filter((body) => !state.retireAt.has(body.id))
     .map((body) => body.text);
@@ -1557,8 +1573,10 @@ function returnIncomplete(state: UndertowState, force = false): void {
 
 function simulationStep(state: UndertowState): void {
   const tide = lunarTide();
-  state.world.tideOffset = tide.offset + Math.sin(state.world.time * Math.PI * 2 / 67) * 0.0025;
-  if (tide.direction !== 'slack') state.world.flowDirection = tide.direction === 'rising' ? 1 : -1;
+  const weatherHeave = state.coastWeather === 'storm' ? 0.0045 : state.coastWeather === 'rain' ? 0.002 : 0;
+  state.world.tideOffset = tide.offset + (state.coastTide - 0.5) * 0.022
+    + Math.sin(state.world.time * Math.PI * 2 / 67) * (0.0025 + weatherHeave);
+  state.world.flowDirection = state.coastTideName === 'falling' ? -1 : 1;
   stepWorld(state.world, FIXED_DT);
   updateFishing(state, FIXED_DT);
   updateSilt(state, FIXED_DT);
@@ -1715,6 +1733,7 @@ function openUndertow(ctx: ProgramContext): void {
   const archive = readArchive(ctx);
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const world = createWorld({ seed: daySeed ^ hashText(archive.join('|')), surfaceY: 0.315, surfacePoints: reducedMotion ? 56 : 112 });
+  const coast = coastalSnapshot();
   const abort = new AbortController();
   const now = performance.now();
   const fisherImage = fisherVisible ? new Image() : null;
@@ -1794,6 +1813,11 @@ function openUndertow(ctx: ProgramContext): void {
     retireAt: new Map(),
     lastReadoutAt: 0,
     lastMirrorText: '',
+    coastWindDegrees: coast.windDegrees,
+    coastWindSpeed: coast.windSpeed,
+    coastTide: coast.tide,
+    coastTideName: coast.tideName,
+    coastWeather: coast.weather,
     closed: false,
   };
   const initialFisherDescription = fisherVisible ? 'A hooded, responsive Dilenci eye is fishing downstream with a bending rod. ' : '';

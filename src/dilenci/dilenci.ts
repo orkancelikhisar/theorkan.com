@@ -10,6 +10,7 @@ import { createDilenciPanel, type DilenciPanelAPI } from './panel';
 import { STIR_LINES, BEG_LINES, ACK_LINES, DEPART_LINES } from './seeds';
 import { isOnVoice, isReplyOnVoice } from './filter';
 import type { ChatTurn } from './llm';
+import { recordCoastalPhrase } from '../coast/coastal-memory';
 
 const LEDGER_PATH = '/home/orkan/.dilenci/ledger.txt';
 const OFFER_HUNGER_THRESHOLD = 0.45;
@@ -276,6 +277,7 @@ export function createDilenci(deps: DilenciDeps): DilenciAPI {
     if (isTerminator(trimmed)) { endConversation(); return; }
 
     ledger.append(trimmed);
+    recordCoastalPhrase(trimmed, 'dilenci', true);
     state.feed(trimmed);
     writeLedgerFile();
     conversation.push({ role: 'user', content: trimmed });

@@ -1,6 +1,7 @@
 import './gallery.css';
 import type { Program, KeyEvent } from '../../kernel/program';
 import { WORKS, type GalleryWork } from './gallery-works';
+import { addCoastalArtifact, markCoastalFlag } from '../../coast/coastal-memory';
 
 // gallery — browse Orkan's works. Modal overlay; arrow keys navigate.
 // Works can be static (a single ASCII string) or animated (a frames array
@@ -89,7 +90,10 @@ async function render(): Promise<void> {
   }
 
   if (w.frames && w.frames.length) showFrames(w);
-  else if (w.generator) showGenerated(w);
+  else if (w.generator) {
+    if (w.title.startsWith('Visitor Plate')) markCoastalFlag('portraitCount');
+    showGenerated(w);
+  }
   else showStatic(w);
 }
 
@@ -109,6 +113,7 @@ const prog: Program = {
   mode: 'modal',
   init: () => {
     if (overlay) return;
+    addCoastalArtifact('studio-image');
     overlay = document.createElement('div');
     overlay.className = 'gallery-overlay';
 

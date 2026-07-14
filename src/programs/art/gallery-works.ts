@@ -17,6 +17,7 @@ import {
   letterToSari,
   artificialGallery,
 } from './gallery-anims';
+import { coastalSnapshot, readCoastalMemory } from '../../coast/coastal-memory';
 
 export interface GalleryWork {
   title: string;
@@ -72,6 +73,39 @@ const VIDEO_WORKS: GalleryWork[] = Object.entries(VIDEO_LOADERS)
 
 // ── Hand-authored pieces (animated + a couple of static survivors) ────────
 const STATIC_WORKS: GalleryWork[] = [
+  {
+    title: 'Visitor Plate / Current Session',
+    year: 'now',
+    caption: 'commands, routes, tide and recovered language. this image belongs only to this visit.',
+    generator: (frame: number) => {
+      const memory = readCoastalMemory();
+      const snapshot = coastalSnapshot(memory);
+      const width = 58;
+      const height = 24;
+      const chars = '  ·.:;+*#';
+      const rows = Array.from({ length: height }, () => Array<string>(width).fill(' '));
+      const seed = memory.seed ^ memory.commandCount ^ Math.floor(frame / 18);
+      for (let row = 0; row < height; row++) {
+        for (let col = 0; col < width; col++) {
+          let value = (seed ^ Math.imul(col + 3, 73856093) ^ Math.imul(row + 5, 19349663)) >>> 0;
+          value = Math.imul(value ^ (value >>> 13), 1274126177) >>> 0;
+          const wave = Math.sin(col * .27 + frame * .025 + snapshot.tide * 5) * 0.16;
+          const density = (value / 4294967295) * .62 + wave + memory.artifacts.length * .012;
+          rows[row][col] = chars[Math.max(0, Math.min(chars.length - 1, Math.floor(density * chars.length)))];
+        }
+      }
+      for (let index = 0; index < memory.footprints.length; index++) {
+        const footprint = memory.footprints[index];
+        const col = Math.abs(footprint.col * 7 + index * 3) % width;
+        const row = Math.abs(footprint.row * 5 + index) % height;
+        rows[row][col] = index % 2 ? '′' : '·';
+      }
+      const phrase = memory.phrases[memory.phrases.length - 1]?.text.toLowerCase() ?? 'nothing entered the water';
+      const inscription = phrase.slice(0, width - 6);
+      for (let index = 0; index < inscription.length; index++) rows[height - 3][index + 3] = inscription[index];
+      return rows.map((row) => row.join('')).join('\n');
+    },
+  },
   {
     title: 'Harbor at 4am',
     year: '2023',
