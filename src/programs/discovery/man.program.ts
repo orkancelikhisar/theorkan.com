@@ -16,6 +16,7 @@ const THREAD_MAN: Record<string, string[]> = {
   'the gallery':  ['GALLERY(7)', '', '`gallery`. ten ascii pieces from orkan\'s portfolio.', 'arrow keys to navigate. q to quit.', '', 'related: `latent`, `music`.'],
   'the noticeboard': ['NOTICEBOARD(7)', '', '`bbs`. old messages, kept on purpose.'],
   'the wanderer': ['WANDERER(7)', '', '`walk`. ten places in orkan\'s universe. you are the wanderer.', 'letter keys move between adjacent places. enter to linger.', 'some places open into other programs.', '', 'related: `gallery`, `music`, `dilenci`, `whois stowaway`.'],
+  'the undertow': ['UNDERTOW(7)', '', 'some sentences do not leave. they learn to float.', 'read /var/tides/undertow.log, then run `undertow`.', 'hold your breath to read below the surface.', '', 'SEE ALSO: the harbor, the regret, the poems.'],
 };
 
 const prog: Program = {

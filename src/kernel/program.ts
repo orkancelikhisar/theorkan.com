@@ -50,7 +50,10 @@ export interface ProgramContext {
     stop(sample: string): void;
     volume(n: number): void;
   };
-  dilenci: { notify(eventName: string, payload?: unknown): void };
+  dilenci: {
+    notify(eventName: string, payload?: unknown): void;
+    status(): { silenced: boolean } | null;
+  };
   events: {
     on(name: string, cb: (payload: unknown) => void): () => void;
     emit(name: string, payload: unknown): void;

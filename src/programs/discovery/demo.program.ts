@@ -134,12 +134,13 @@ const INLINE_SEQUENCE: Array<[string, string[]]> = [
   ['dilenci', []],
 ];
 
-const DEVICES = ['/dev/heart', '/dev/wind', '/dev/harbor', '/dev/salt', '/dev/regret'] as const;
+const DEVICES = ['/dev/heart', '/dev/wind', '/dev/harbor', '/dev/tide', '/dev/salt', '/dev/regret'] as const;
 
 const PANELS = ['aquarium', 'latent'];
 
 const MODAL_SCHEDULE: Array<{ name: string; hold: number } | { name: 'gallery' | 'walk' }> = [
   { name: 'gallery' },
+  { name: 'undertow', hold: 1_200 },
   { name: 'walk' },
   { name: 'life',    hold: MODAL_HOLD_MS },
   { name: '2048',    hold: MODAL_HOLD_MS },

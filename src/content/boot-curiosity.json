@@ -13,5 +13,6 @@
   "/dev/wind is offline by 4 minutes. it will return. (ignored)",
   "someone tried to cat /dev/null. it answered. (ignored)",
   "the regatta scoreboard rolled back a tenth of a second. (ignored)",
-  "the dilenci stirred during boot. unusual. (ignored)"
+  "the dilenci stirred during boot. unusual. (ignored)",
+  "/var/tides recorded a sentence moving against the current. (ignored)"
 ]

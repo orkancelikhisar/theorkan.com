@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { complete } from '../../src/terminal/completion';
+import { BASELINE_DISCOVERED, BUILTIN_NAMES } from '../../src/kernel/shell';
+import { getRegistry } from '../../src/kernel/registry';
 
 describe('tab completion', () => {
   it('completes a command prefix from known commands', () => {
@@ -33,5 +35,15 @@ describe('tab completion', () => {
   it('returns empty when nothing matches', () => {
     const out = complete('xyz', ['help'], { discoveredOnly: false });
     expect(out.candidates).toEqual([]);
+  });
+
+  it('exposes undertow through the real public registry', () => {
+    const all = [...BUILTIN_NAMES, ...getRegistry().keys()];
+    const out = complete('', all, {
+      discoveredOnly: true,
+      baseline: [...BASELINE_DISCOVERED, ...BUILTIN_NAMES],
+      discovered: [],
+    });
+    expect(out.candidates).toContain('undertow');
   });
 });

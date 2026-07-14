@@ -56,9 +56,9 @@ describe('overworld map', () => {
     expect(zoneAt(boatPos!)).toBe('boat');
   });
 
-  it('exposes one crossover per building that has one', () => {
+  it('exposes building crossovers and the shore undertow', () => {
     const commands = OVERWORLD_CROSSOVERS.map((c) => c.command).sort();
-    expect(commands).toEqual(['dilenci', 'gallery', 'music', 'whois']);
+    expect(commands).toEqual(['dilenci', 'gallery', 'music', 'undertow', 'whois']);
   });
 
   it('all six interior building zones (kitchen/window/studio/alley/radio/empty) are reachable', () => {

@@ -156,6 +156,7 @@ export function createDilenci(deps: DilenciDeps): DilenciAPI {
   let recentErrorTimestamps: number[] = [];
   let lastActiveAt = Date.now();
   let lastIdleMs = 0;
+  let modalActive = false;
 
   let conversation: ChatTurn[] = [];
 
@@ -231,6 +232,7 @@ export function createDilenci(deps: DilenciDeps): DilenciAPI {
 
   function appear(forceBegMode = false): void {
     if (state.get().silenced) return;
+    if (modalActive) return;
     if (panel.isOpen()) return;
 
     triggers.markFired();
@@ -333,6 +335,7 @@ export function createDilenci(deps: DilenciDeps): DilenciAPI {
 
   function rollAndMaybeAppear(): void {
     if (state.get().silenced) return;
+    if (modalActive) return;
     if (triggers.inCooldown()) { pendingMultiplier = 0; return; }
     if (panel.isOpen()) return;
     const ctx = {
@@ -346,6 +349,7 @@ export function createDilenci(deps: DilenciDeps): DilenciAPI {
 
   function selfWhisper(): void {
     if (state.get().silenced) return;
+    if (modalActive) return;
     const h = state.get().hunger;
     const p = 0.25 + h * 0.55;
     if (Math.random() < p) {
@@ -359,6 +363,7 @@ export function createDilenci(deps: DilenciDeps): DilenciAPI {
   const ghostContainer = document.body;
   function showGhost(text: string): void {
     if (state.get().silenced) return;
+    if (modalActive) return;
     if (inOfferMode) return;        // don't crowd a live conversation
     const el = document.createElement('div');
     el.className = 'dilenci-ghost';
@@ -386,7 +391,7 @@ export function createDilenci(deps: DilenciDeps): DilenciAPI {
 
   async function ghostPoemTick(): Promise<void> {
     if (document.hidden) { scheduleNextGhost(); return; }
-    if (state.get().silenced || inOfferMode) { scheduleNextGhost(); return; }
+    if (state.get().silenced || inOfferMode || modalActive) { scheduleNextGhost(); return; }
     let text: string | null = null;
     if (deps.llm?.ready()) {
       try {
@@ -416,6 +421,13 @@ export function createDilenci(deps: DilenciDeps): DilenciAPI {
     lastIdleMs = ms;
   });
   deps.events.on('shell:active', () => { lastIdleMs = 0; lastActiveAt = Date.now(); });
+  deps.events.on('shell:modal', (payload: unknown) => {
+    modalActive = Boolean((payload as { active?: boolean })?.active);
+    if (!modalActive) return;
+    clearTimer();
+    panel.close();
+    if (inOfferMode) leaveOfferMode();
+  });
   deps.events.on('shell:command', (p: unknown) => {
     lastActiveAt = Date.now();
     const line = typeof p === 'string' ? p : (p as { line: string })?.line ?? '';
@@ -447,7 +459,7 @@ export function createDilenci(deps: DilenciDeps): DilenciAPI {
 
   const firstDelay = FIRST_APPEARANCE_MIN_MS + Math.random() * (FIRST_APPEARANCE_MAX_MS - FIRST_APPEARANCE_MIN_MS);
   window.setTimeout(() => {
-    if (state.get().silenced) return;
+    if (state.get().silenced || modalActive) return;
     triggers.setLastFired(0);
     appear();
   }, firstDelay);

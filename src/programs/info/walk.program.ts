@@ -172,6 +172,7 @@ function dispatchCrossover(ctx: ProgramContext, command: string, argv?: string[]
   close();
   const prog = getRegistry().get(command);
   if (!prog) return;
+  ctx.events.emit('shell:program-launched', { name: prog.name });
   const full = [command, ...(argv ?? [])];
   try {
     if (prog.onCommand) {
@@ -268,7 +269,7 @@ const prog: Program = {
     'walk — wander orkan’s places, doryen-style.\n' +
     '  hold an arrow key (or wasd / hjkl) to walk in that direction.\n' +
     '  the player moves at a constant cadence while the key is held.\n' +
-    '  walk into a building doorway to enter it. tiles G M d C are\n' +
+    '  walk into a building doorway to enter it. tiles G M d C U are\n' +
     '  interactive — press [space] on one to launch another program.\n' +
     '  [enter] linger here — pick a new vignette at this place.\n' +
     '  [q] or [esc] to leave. state persists across opens.',

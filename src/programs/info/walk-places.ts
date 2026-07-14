@@ -104,6 +104,7 @@ export const PLACES: Record<string, Place> = {
       'you are at the shore.\nlow tide. the line of weed where the water was.',
       'you are at the shore.\nsmall bird, larger bird, no bird.',
     ],
+    crossover: { command: 'undertow', hint: 'the water is moving the wrong way. step in.' },
   },
 
   field: {

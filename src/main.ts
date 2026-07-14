@@ -63,7 +63,10 @@ async function main(): Promise<void> {
 
   // Modal program tracking
   let modalProgram: Program | null = null;
-  function setModal(p: Program | null): void { modalProgram = p; }
+  function setModal(p: Program | null): void {
+    modalProgram = p;
+    events.emit('shell:modal', { active: p != null, name: p?.name ?? null });
+  }
 
   // Forward-declare shell for ctxFactory to read cwd lazily.
   // eslint-disable-next-line prefer-const -- assigned after ctxFactory captures it
@@ -93,7 +96,11 @@ async function main(): Promise<void> {
       stop: () => {},
       volume: () => {},
     },
-    dilenci: { notify: (n, p) => dilenci?.notify(n, p) },
+    dilenci: {
+      notify: (n, p) => dilenci?.notify(n, p),
+      status: () => dilenci?.status()
+        ?? { silenced: localStorage.getItem('dilenci.silenced') === '1' },
+    },
     events: {
       on: (n, cb) => events.on(n, cb),
       emit: (n, p) => events.emit(n, p),
@@ -120,6 +127,22 @@ async function main(): Promise<void> {
     () => history.all(),
   );
 
+  // Programs can launch other programs from inside the world (walk's doors,
+  // for example). Bring those launches back through the shell host so modal
+  // keyboard routing and the discovery ledger remain correct.
+  events.on('shell:program-launched', (payload: unknown) => {
+    const name = (payload as { name?: string })?.name;
+    if (!name) return;
+    const launched = registry.get(name);
+    if (!launched) return;
+    shell.markDiscovered(launched.name);
+    if (launched.mode === 'modal') setModal(launched);
+  });
+  events.on('shell:modal-ended', (payload: unknown) => {
+    const name = (payload as { name?: string })?.name;
+    if (!name || modalProgram?.name === name) setModal(null);
+  });
+
   // Listen for shell:program-modal to capture modal program reference for key routing.
   // Since shell.run() invokes program.init() which spawns the modal overlay, but we
   // also need to route keys to it — intercept by checking registry mode on submit.
@@ -140,6 +163,7 @@ async function main(): Promise<void> {
     llm?.onFailed(() => { /* silent failure per §8.3 */ });
     // Expose for the dilenci shell command without dragging dilenci into ctx.
     (globalThis as unknown as { __dilenci?: DilenciAPI }).__dilenci = dilenci;
+    events.emit('shell:modal', { active: modalProgram != null, name: modalProgram?.name ?? null });
   }, 2_000);
 
   // Haunting — ambient liminal phrases at the margins. Starts a few minutes

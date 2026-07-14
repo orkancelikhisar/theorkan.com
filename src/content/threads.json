@@ -12,6 +12,7 @@
     { "id": "the poems",    "leads": "ls /usr/share/poems" },
     { "id": "the gallery",  "leads": "run `gallery` (arrives v0.4)" },
     { "id": "the noticeboard", "leads": "run `bbs`" },
-    { "id": "the wanderer", "leads": "run `walk`. ten places. you are the wanderer." }
+    { "id": "the wanderer", "leads": "run `walk`. ten places. you are the wanderer." },
+    { "id": "the undertow", "leads": "cat /var/tides/undertow.log, then run `undertow`." }
   ]
 }

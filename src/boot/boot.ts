@@ -59,7 +59,7 @@ export function buildBootScript(): BootLine[] {
   lines.push({ kind: 'ok', text: '[ OK ] mounting /                ext-fake' });
   lines.push({ kind: 'ok', text: '[ OK ] mounting /var/log' });
   lines.push({ kind: 'ok', text: '[ OK ] mounting /var/regret      62 entries' });
-  lines.push({ kind: 'ok', text: '[ OK ] mounting /dev             heart, wind, harbor, salt, regret' });
+  lines.push({ kind: 'ok', text: '[ OK ] mounting /dev             heart, wind, harbor, salt, regret, tide' });
   lines.push({ kind: 'ok', text: '[ OK ] mounting /usr/share/poems 23 fragments' });
   lines.push({ kind: 'ok', text: '[ OK ] driver: keyboard' });
   lines.push({ kind: 'ok', text: '[ OK ] driver: void              drift, whisper, shine' });

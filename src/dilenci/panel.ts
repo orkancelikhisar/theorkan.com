@@ -1,4 +1,5 @@
 import './dilenci.css';
+import { renderDilenciEye, type DilenciEyeState } from './eye';
 
 const PREFIXES = [
   '† he stirred †',
@@ -24,75 +25,6 @@ export interface DilenciPanelAPI {
   setExpression(state: DilenciExpression): void;
   isOpen(): boolean;
   destroy(): void;
-}
-
-// ── Procedural ASCII eye ─────────────────────────────────────────────────────
-// Renders an almond-shaped eye into a fixed-size char grid. The pupil moves
-// within the iris based on `lookX`/`lookY` in [-1, 1]; `blink` collapses the
-// vertical opening from 0 (open) to 1 (closed). Each repaint is one string;
-// we render that into a <pre> tag.
-
-const EYE_W = 29;
-const EYE_H = 9;
-const ASPECT_Y = 1.7;             // monospace chars are ~1.7x taller than wide
-const LID_HALF_W = 12;
-const LID_HALF_H_OPEN = 3.6;
-const IRIS_R = 2.6;
-const PUPIL_R = 0.9;
-const MAX_PUPIL_OFFSET_X = 2.4;
-const MAX_PUPIL_OFFSET_Y = 1.1;
-
-interface EyeState {
-  lookX: number;       // [-1, 1]
-  lookY: number;       // [-1, 1]
-  blink: number;       // [0, 1]
-  dilation: number;    // 0.7 (squint) .. 1.3 (wide)
-}
-
-function renderEye(s: EyeState): string {
-  const lidH = LID_HALF_H_OPEN * Math.max(0.05, 1 - s.blink) * s.dilation;
-  const lidW = LID_HALF_W * (0.85 + 0.15 * s.dilation);
-  const irisR = IRIS_R * s.dilation;
-  const cx = (EYE_W - 1) / 2;
-  const cy = (EYE_H - 1) / 2;
-  const offX = s.lookX * MAX_PUPIL_OFFSET_X;
-  const offY = s.lookY * MAX_PUPIL_OFFSET_Y;
-
-  let out = '';
-  for (let r = 0; r < EYE_H; r++) {
-    for (let c = 0; c < EYE_W; c++) {
-      const dx = c - cx;
-      const dyRow = r - cy;
-      const dy = dyRow * ASPECT_Y;
-
-      // Almond eyelid — ellipse in (col, row) space. Anything outside is sky.
-      const lidNorm = Math.sqrt((dx / lidW) ** 2 + (dyRow / lidH) ** 2);
-      if (lidNorm > 1) { out += ' '; continue; }
-
-      // Pupil/iris distance in cell-aspect-corrected space.
-      const pdx = dx - offX;
-      const pdy = dy - offY * ASPECT_Y;
-      const distPupil = Math.sqrt(pdx * pdx + pdy * pdy);
-      const distIrisN = distPupil / irisR;
-
-      const nearEdge = lidNorm > 0.9;
-
-      if (distPupil < PUPIL_R) {
-        out += '@';
-      } else if (distIrisN < 1) {
-        out += distIrisN < 0.55 ? 'O' : 'o';
-      } else if (nearEdge) {
-        // Curve the eyelid with under/overscored chars depending on side.
-        if (dyRow < -0.4) out += '_';
-        else if (dyRow > 0.4) out += '_';
-        else out += '.';
-      } else {
-        out += '.';
-      }
-    }
-    out += '\n';
-  }
-  return out.replace(/\n$/, '');
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -124,7 +56,7 @@ export function createDilenciPanel(container: HTMLElement): DilenciPanelAPI {
   el.append(prefixEl, eyeEl, thinkingEl, lineEl, hintEl);
   container.appendChild(el);
 
-  const eyeState: EyeState = { lookX: 0, lookY: 0, blink: 0, dilation: 1 };
+  const eyeState: DilenciEyeState = { lookX: 0, lookY: 0, blink: 0, dilation: 1 };
   let open = false;
   let expression: DilenciExpression = 'default';
   let blinkTimer: number | null = null;
@@ -134,7 +66,7 @@ export function createDilenciPanel(container: HTMLElement): DilenciPanelAPI {
 
   function paint(): void {
     rafQueued = false;
-    eyeEl.textContent = renderEye(eyeState);
+    eyeEl.textContent = renderDilenciEye(eyeState);
   }
 
   function schedulePaint(): void {

@@ -18,7 +18,7 @@ const WALKABLE = new Set<string>([
   'B',                              // boat deck
   'D',                              // doorway (just a labelled walkable tile now)
   'S', 'F',                         // shore, field
-  'G', 'M', 'd', 'C',               // crossover trigger tiles
+  'G', 'M', 'd', 'C', 'U',          // crossover trigger tiles
 ]);
 
 export function isWalkable(ch: string): boolean {
@@ -37,7 +37,7 @@ export function tierOf(ch: string): Tier {
   if (ch === ' ') return 'faint';
   if (ch === 'S' || ch === 'F') return 'dim';
   if (ch === 'D') return 'bright';
-  if (ch === 'G' || ch === 'M' || ch === 'd' || ch === 'C') return 'bright';
+  if (ch === 'G' || ch === 'M' || ch === 'd' || ch === 'C' || ch === 'U') return 'bright';
   // box drawing chars (building walls)
   if ('┌─┐│└─┘├┤┬┴┼'.includes(ch)) return 'normal';
   // letters of building labels embedded in walls
@@ -157,6 +157,11 @@ function buildOverworld(): { grid: string[][]; crossovers: CrossoverTile[] } {
     }
   }
 
+  // A current running against the visible shore. Unlike the building
+  // crossovers, this one is found in open terrain.
+  g[13][47] = 'U';
+  crossovers.push({ at: { col: 47, row: 13 }, command: 'undertow' });
+
   return { grid: g, crossovers };
 }
 
@@ -190,7 +195,7 @@ export function zoneAt(p: Pos): string | null {
   }
 
   // Terrain zones
-  if (tile === 'S') return 'shore';
+  if (tile === 'S' || tile === 'U') return 'shore';
   if (tile === 'F') return 'field';
   if (tile === 'B' || tile === '|') return 'boat';
 

@@ -87,6 +87,7 @@ export const SNAPSHOT: FSSnapshot = dir({
       '.dilenci': dir({
         'ledger.txt': hidden(''),
         'last_words.txt': hidden(''),
+        'undertow.txt': hidden(''),
       }),
       '.istanbul': dir({
         'note.txt': hidden('a directory. it might fill later.'),
@@ -143,6 +144,20 @@ export const SNAPSHOT: FSSnapshot = dir({
       '2024_04_18': file('the things i did not write.'),
       '2024_11_02': file('a phone call i did not return.'),
       '2025_01_07': file('the song i had in my head for a week.'),
+    }),
+    tides: dir({
+      'undertow.log': file([
+        '# /var/tides/undertow.log',
+        '# instrument: harbor gauge 03',
+        '',
+        '[03:11] return current detected beneath still water.',
+        '[03:14] material recovered: one article, two names.',
+        '[03:17] sentence incomplete. structurally sound.',
+        '[03:21] ending lost below instrument range.',
+        '[03:22] tide unchanged.',
+        '',
+        'run `undertow`. hold your breath to read below.',
+      ].join('\n')),
     }),
   }),
 });
