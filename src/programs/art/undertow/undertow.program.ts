@@ -1271,7 +1271,10 @@ function drawDilenci(state: UndertowState): void {
     g.textAlign = 'right';
     g.fillStyle = BONE_DIM;
     g.globalAlpha = fade * 0.42 * dim;
-    g.fillText(state.fishing.murmur, entityX - eyeWidth * 0.34, entityY - eyeHeight * 0.72);
+    const murmurY = imageReady
+      ? Math.max(compact ? 24 : 30, art.y - (compact ? 8 : 14))
+      : entityY - eyeHeight * 0.72;
+    g.fillText(state.fishing.murmur, entityX - eyeWidth * 0.34, murmurY);
   }
   g.restore();
 }
