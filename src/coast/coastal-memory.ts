@@ -28,7 +28,6 @@ export interface CoastalMemory {
   frequencies: string[];
   footprints: CoastalFootprint[];
   lighthousePasses: number;
-  followerSightings: number;
   eyeSightings: number;
   impossibleRoomSeen: boolean;
   absenceSeen: boolean;
@@ -76,7 +75,6 @@ export function freshCoastalMemory(now = Date.now()): CoastalMemory {
     frequencies: [],
     footprints: [],
     lighthousePasses: 0,
-    followerSightings: 0,
     eyeSightings: 0,
     impossibleRoomSeen: false,
     absenceSeen: false,
@@ -129,7 +127,6 @@ export function restoreCoastalMemory(value: unknown, now = Date.now()): CoastalM
     frequencies,
     footprints,
     lighthousePasses: finiteInt(candidate.lighthousePasses),
-    followerSightings: finiteInt(candidate.followerSightings),
     eyeSightings: finiteInt(candidate.eyeSightings),
     impossibleRoomSeen: Boolean(candidate.impossibleRoomSeen),
     absenceSeen: Boolean(candidate.absenceSeen),
@@ -256,7 +253,7 @@ export function coastalSnapshot(memory = readCoastalMemory(), now = Date.now()):
 }
 
 export function markCoastalFlag(
-  flag: 'lighthousePasses' | 'followerSightings' | 'eyeSightings' | 'portraitCount',
+  flag: 'lighthousePasses' | 'eyeSightings' | 'portraitCount',
   now = Date.now(),
 ): CoastalMemory {
   return mutateCoastalMemory((memory) => { memory[flag] += 1; }, now);
